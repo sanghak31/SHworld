@@ -1,18 +1,21 @@
 import streamlit as st
 import random
 
-# 단어 목록 (6글자 단어)
 WORDS = [
-    "planet", "border", "submit", "wallet", "danger", "silent",
-    "charge", "flight", "master", "castle", "rescue", "bucket",
-    "animal", "beauty", "circle", "damage", "effort", "fabric",
-    "galaxy", "hunger", "injury", "jungle", "kitten", "legend",
-    "moment", "number", "object", "people", "quartz", "result",
-    "singer", "ticket", "update", "valley", "window", "yellow",
-    "zephyr", "chance", "decent", "famous", "garden", "horror",
-    "island", "leader", "manual", "nation", "option", "prince",
-    "random", "school", "temple", "unique", "vision", "winner"
+    "planet", "border", "submit", "wallet", "danger", "silent", "charge", "flight", "master",
+    "castle", "rescue", "bucket", "animal", "beauty", "circle", "damage", "effort", "fabric",
+    "galaxy", "hunger", "injury", "jungle", "kitten", "legend", "moment", "number", "object",
+    "people", "quartz", "result", "singer", "ticket", "update", "valley", "window", "yellow",
+    "zephyr", "chance", "decent", "famous", "garden", "horror", "island", "leader", "manual",
+    "nation", "option", "prince", "random", "school", "temple", "unique", "vision", "winner",
+    "advice", "bright", "candle", "doctor", "effort", "friend", "global", "hammer", "impact",
+    "joyful", "kitten", "listen", "manner", "native", "office", "pretty", "quiver", "resist",
+    "signal", "travel", "urgent", "violin", "wander", "writer", "access", "border", "bottle",
+    "custom", "dancer", "easily", "flavor", "gentle", "honest", "indeed", "jacket", "keeper",
+    "lawyer", "magnet", "narrow", "orange", "pillow", "retail", "silver", "tomato", "urgent",
+    "vessel", "winter", "younger", "zombie"
 ]
+
 
 # 초기 상태 설정
 if 'answer' not in st.session_state:
