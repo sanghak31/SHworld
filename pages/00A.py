@@ -4,8 +4,16 @@ import random
 # 6-letter English word list
 WORDS = [
     "planet", "border", "submit", "wallet", "danger", "silent",
-    "charge", "flight", "master", "castle", "rescue", "bucket"
+    "charge", "flight", "master", "castle", "rescue", "bucket",
+    "animal", "beauty", "circle", "damage", "effort", "fabric",
+    "galaxy", "hunger", "injury", "jungle", "kitten", "legend",
+    "moment", "number", "object", "people", "quartz", "result",
+    "singer", "ticket", "update", "valley", "window", "yellow",
+    "zephyr", "chance", "decent", "famous", "garden", "horror",
+    "island", "leader", "manual", "nation", "option", "prince",
+    "random", "school", "temple", "unique", "vision", "winner"
 ]
+
 
 # Initialize game state
 if 'answer' not in st.session_state:
