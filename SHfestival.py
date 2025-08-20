@@ -1,4 +1,4 @@
-₩import streamlit as st
+import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
