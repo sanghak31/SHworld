@@ -16,6 +16,10 @@ if 'game_finished' not in st.session_state:
     st.session_state.game_finished = False
 if 'player_choice' not in st.session_state:
     st.session_state.player_choice = None
+if 'shuffle_moves' not in st.session_state:
+    st.session_state.shuffle_moves = []
+if 'current_positions' not in st.session_state:
+    st.session_state.current_positions = [0, 1, 2]  # 각 컵의 현재 위치
 
 # 타이틀
 st.title("🥤 야바위 게임 🟡")
@@ -26,25 +30,56 @@ with st.expander("게임 방법"):
     st.write("""
     1. **시작** 버튼을 눌러 게임을 시작하세요
     2. 노란색 공이 들어있는 컵을 기억하세요
-    3. 컵들이 섞인 후, 공이 들어있다고 생각하는 컵을 선택하세요
-    4. 정답을 맞춰보세요!
+    3. 컵들이 섞이는 과정을 주의 깊게 지켜보세요
+    4. 컵들이 섞인 후, 공이 들어있다고 생각하는 컵을 선택하세요
+    5. 정답을 맞춰보세요!
     """)
 
-# 메인 게임 영역
-col1, col2, col3 = st.columns(3)
+def generate_shuffle_moves():
+    """섞기 동작들을 생성"""
+    moves = []
+    num_moves = random.randint(5, 8)  # 5~8회 섞기
+    
+    for _ in range(num_moves):
+        pos1 = random.randint(0, 2)
+        pos2 = random.randint(0, 2)
+        while pos2 == pos1:
+            pos2 = random.randint(0, 2)
+        moves.append((pos1, pos2))
+    
+    return moves
 
-def show_cups_with_ball():
+def apply_shuffle_move(positions, move):
+    """섞기 동작을 적용하고 새로운 위치 반환"""
+    new_positions = positions.copy()
+    pos1, pos2 = move
+    new_positions[pos1], new_positions[pos2] = new_positions[pos2], new_positions[pos1]
+    return new_positions
+
+def show_cups_with_ball(positions=None):
     """공이 보이는 상태의 컵들을 표시"""
+    if positions is None:
+        positions = [0, 1, 2]
+    
+    col1, col2, col3 = st.columns(3)
     cols = [col1, col2, col3]
+    
+    # 현재 공이 있는 위치 찾기
+    ball_current_pos = None
+    for i, original_pos in enumerate(positions):
+        if original_pos == st.session_state.ball_position:
+            ball_current_pos = i
+            break
+    
     for i in range(3):
         with cols[i]:
-            if i == st.session_state.ball_position:
+            if i == ball_current_pos:
                 st.markdown("""
                 <div style='text-align: center; font-size: 60px; margin: 20px;'>
                     🥤<br>🟡
                 </div>
                 """, unsafe_allow_html=True)
-                st.markdown("<p style='text-align: center; color: orange;'><b>공이 여기에!</b></p>", 
+                st.markdown(f"<p style='text-align: center; color: orange;'><b>컵 {positions[i]+1}번 (공!)</b></p>", 
                            unsafe_allow_html=True)
             else:
                 st.markdown("""
@@ -52,11 +87,85 @@ def show_cups_with_ball():
                     🥤
                 </div>
                 """, unsafe_allow_html=True)
-                st.markdown("<p style='text-align: center;'>빈 컵</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align: center;'>컵 {positions[i]+1}번</p>", unsafe_allow_html=True)
+
+def show_shuffle_animation():
+    """섞기 애니메이션을 보여줌"""
+    st.markdown("<h3 style='text-align: center;'>🔄 컵을 섞고 있습니다...</h3>", 
+                unsafe_allow_html=True)
+    
+    # 초기 위치
+    current_positions = [0, 1, 2]
+    moves = st.session_state.shuffle_moves
+    
+    # 각 스텝별로 애니메이션 표시
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    animation_container = st.empty()
+    
+    for step, move in enumerate(moves):
+        pos1, pos2 = move
+        
+        # 현재 상태 표시
+        with animation_container.container():
+            st.markdown(f"**{step + 1}/{len(moves)} 단계: 컵 {pos1+1}번 ↔ 컵 {pos2+1}번 교환**")
+            
+            col1, col2, col3 = st.columns(3)
+            cols = [col1, col2, col3]
+            
+            # 현재 공이 있는 위치 찾기
+            ball_current_pos = None
+            for i, original_pos in enumerate(current_positions):
+                if original_pos == st.session_state.ball_position:
+                    ball_current_pos = i
+                    break
+            
+            for i in range(3):
+                with cols[i]:
+                    # 교환되는 컵들 강조
+                    border_color = "red" if i in [pos1, pos2] else "gray"
+                    
+                    if i == ball_current_pos:
+                        st.markdown(f"""
+                        <div style='text-align: center; font-size: 50px; margin: 15px; 
+                                   border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
+                            🥤<br>🟡
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown(f"<p style='text-align: center; color: orange;'><b>컵 {current_positions[i]+1}번</b></p>", 
+                                   unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div style='text-align: center; font-size: 50px; margin: 15px; 
+                                   border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
+                            🥤
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.markdown(f"<p style='text-align: center;'>컵 {current_positions[i]+1}번</p>", 
+                                   unsafe_allow_html=True)
+        
+        # 교환 실행
+        current_positions = apply_shuffle_move(current_positions, move)
+        
+        # 진행률 업데이트
+        progress_bar.progress((step + 1) / len(moves))
+        status_text.text(f"교환 완료: {step + 1}/{len(moves)}")
+        
+        time.sleep(1.5)  # 각 단계마다 1.5초 대기
+    
+    # 최종 위치 저장
+    st.session_state.current_positions = current_positions
+    
+    # 완료 메시지
+    progress_bar.progress(1.0)
+    status_text.text("섞기 완료!")
+    time.sleep(1)
 
 def show_shuffled_cups():
     """섞인 후의 컵들을 표시 (공은 숨김)"""
+    col1, col2, col3 = st.columns(3)
     cols = [col1, col2, col3]
+    
     for i in range(3):
         with cols[i]:
             st.markdown("""
@@ -64,21 +173,31 @@ def show_shuffled_cups():
                 🥤
             </div>
             """, unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align: center;'>위치 {i+1}</p>", unsafe_allow_html=True)
             
             # 게임이 끝나지 않았다면 선택 버튼 표시
             if not st.session_state.game_finished:
-                if st.button(f"컵 {i+1} 선택", key=f"cup_{i}", use_container_width=True):
+                if st.button(f"위치 {i+1} 선택", key=f"cup_{i}", use_container_width=True):
                     st.session_state.player_choice = i
                     st.session_state.game_finished = True
                     st.rerun()
 
 def show_result_cups():
     """결과를 보여주는 컵들"""
+    col1, col2, col3 = st.columns(3)
     cols = [col1, col2, col3]
+    
+    # 현재 공이 있는 실제 위치 찾기
+    ball_actual_pos = None
+    for i, original_pos in enumerate(st.session_state.current_positions):
+        if original_pos == st.session_state.ball_position:
+            ball_actual_pos = i
+            break
+    
     for i in range(3):
         with cols[i]:
-            # 정답 컵과 선택한 컵 표시
-            if i == st.session_state.ball_position:
+            # 정답 위치와 선택한 위치 표시
+            if i == ball_actual_pos:
                 st.markdown("""
                 <div style='text-align: center; font-size: 60px; margin: 20px;'>
                     🥤<br>🟡
@@ -88,7 +207,7 @@ def show_result_cups():
                     st.markdown("<p style='text-align: center; color: green;'><b>✅ 정답!</b></p>", 
                                unsafe_allow_html=True)
                 else:
-                    st.markdown("<p style='text-align: center; color: orange;'><b>공이 여기에 있었어요!</b></p>", 
+                    st.markdown(f"<p style='text-align: center; color: orange;'><b>공이 여기에! (원래 컵 {st.session_state.ball_position+1}번)</b></p>", 
                                unsafe_allow_html=True)
             else:
                 st.markdown("""
@@ -100,7 +219,9 @@ def show_result_cups():
                     st.markdown("<p style='text-align: center; color: red;'><b>❌ 당신의 선택</b></p>", 
                                unsafe_allow_html=True)
                 else:
-                    st.markdown("<p style='text-align: center;'>빈 컵</p>", unsafe_allow_html=True)
+                    original_cup = st.session_state.current_positions[i]
+                    st.markdown(f"<p style='text-align: center;'>빈 컵 (원래 컵 {original_cup+1}번)</p>", 
+                               unsafe_allow_html=True)
 
 # 게임 로직
 if not st.session_state.game_started:
@@ -114,6 +235,8 @@ if not st.session_state.game_started:
         st.session_state.shuffled = False
         st.session_state.game_finished = False
         st.session_state.player_choice = None
+        st.session_state.shuffle_moves = generate_shuffle_moves()
+        st.session_state.current_positions = [0, 1, 2]
         st.rerun()
 
 elif not st.session_state.shuffled:
@@ -123,25 +246,49 @@ elif not st.session_state.shuffled:
     
     show_cups_with_ball()
     
-    # 3초 후 자동으로 섞기
-    if st.button("🔄 컵 섞기!", type="primary", use_container_width=True):
-        with st.spinner("컵을 섞고 있습니다..."):
-            time.sleep(2)  # 섞는 애니메이션 효과
+    st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
+                unsafe_allow_html=True)
+    
+    # 컵 섞기 버튼
+    if st.button("🔄 컵 섞기 시작!", type="primary", use_container_width=True):
+        show_shuffle_animation()
         st.session_state.shuffled = True
         st.rerun()
 
 elif not st.session_state.game_finished:
     # 선택 단계
-    st.markdown("<h3 style='text-align: center;'>🤔 어느 컵에 공이 들어있을까요?</h3>", 
+    st.markdown("<h3 style='text-align: center;'>🤔 어느 위치에 공이 들어있을까요?</h3>", 
                 unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>컵을 선택해주세요!</p>", 
+    st.markdown("<p style='text-align: center; color: gray;'>위치를 선택해주세요!</p>", 
                 unsafe_allow_html=True)
+    
+    # 섞기 과정 요약 표시
+    with st.expander("섞기 과정 요약 보기"):
+        st.write("**수행된 교환들:**")
+        for i, (pos1, pos2) in enumerate(st.session_state.shuffle_moves):
+            st.write(f"{i+1}. 컵 {pos1+1}번 ↔ 컵 {pos2+1}번")
+        
+        st.write(f"**시작**: 공이 컵 {st.session_state.ball_position+1}번에 있었음")
+        
+        # 최종 위치 계산
+        ball_final_pos = None
+        for i, original_pos in enumerate(st.session_state.current_positions):
+            if original_pos == st.session_state.ball_position:
+                ball_final_pos = i + 1
+                break
+        st.write(f"**현재**: 공이 위치 {ball_final_pos}번에 있음")
     
     show_shuffled_cups()
 
 else:
     # 결과 표시
-    if st.session_state.player_choice == st.session_state.ball_position:
+    ball_final_pos = None
+    for i, original_pos in enumerate(st.session_state.current_positions):
+        if original_pos == st.session_state.ball_position:
+            ball_final_pos = i
+            break
+            
+    if st.session_state.player_choice == ball_final_pos:
         st.markdown("<h2 style='text-align: center; color: green;'>🎉 축하합니다! 정답입니다! 🎉</h2>", 
                     unsafe_allow_html=True)
         st.balloons()
@@ -160,6 +307,8 @@ else:
             st.session_state.shuffled = False
             st.session_state.game_finished = False
             st.session_state.player_choice = None
+            st.session_state.shuffle_moves = []
+            st.session_state.current_positions = [0, 1, 2]
             st.rerun()
 
 # 푸터
