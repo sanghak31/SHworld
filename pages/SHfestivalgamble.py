@@ -89,13 +89,14 @@ def show_cups_with_ball(positions=None):
                 """, unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center;'>컵 {positions[i]+1}번</p>", unsafe_allow_html=True)
 
-def show_countdown():
-    """섞기 시작 전 3초 카운트다운"""
+def show_shuffle_animation_inline():
+    """같은 위치에서 섞기 애니메이션을 보여줌 (공은 숨김)"""
+    # 카운트다운 먼저 실행
     countdown_container = st.empty()
     
     for i in range(3, 0, -1):
         countdown_container.markdown(f"""
-        <div style='text-align: center; font-size: 80px; color: red; font-weight: bold; margin: 50px;'>
+        <div style='text-align: center; font-size: 80px; color: red; font-weight: bold; margin: 30px;'>
             {i}
         </div>
         <h3 style='text-align: center;'>초 후에 섞기 시작!</h3>
@@ -103,18 +104,16 @@ def show_countdown():
         time.sleep(1)
     
     countdown_container.markdown("""
-    <div style='text-align: center; font-size: 60px; color: green; font-weight: bold; margin: 50px;'>
+    <div style='text-align: center; font-size: 60px; color: green; font-weight: bold; margin: 30px;'>
         시작! 🔄
     </div>
     """, unsafe_allow_html=True)
     time.sleep(0.5)
-
-def show_shuffle_animation():
-    """섞기 애니메이션을 보여줌 (공은 숨김)"""
-    # 카운트다운 먼저 실행
-    show_countdown()
+    countdown_container.empty()
     
-    st.markdown("<h3 style='text-align: center;'>🔄 컵을 섞고 있습니다...</h3>", 
+    # 섞기 상태 표시
+    status_container = st.empty()
+    status_container.markdown("<h3 style='text-align: center;'>🔄 컵을 섞고 있습니다...</h3>", 
                 unsafe_allow_html=True)
     
     # 초기 위치
@@ -124,16 +123,18 @@ def show_shuffle_animation():
     # 각 스텝별로 애니메이션 표시
     progress_bar = st.progress(0)
     status_text = st.empty()
-    animation_container = st.empty()
+    
+    # 컵 표시 영역 (기존 컵 위치 재사용)
+    col1, col2, col3 = st.columns(3)
+    cups_container = st.container()
     
     for step, move in enumerate(moves):
         pos1, pos2 = move
         
         # 현재 상태 표시 (공은 숨김)
-        with animation_container.container():
+        with cups_container:
             st.markdown(f"**{step + 1}/{len(moves)} 단계: 컵 {pos1+1}번 ↔ 컵 {pos2+1}번 교환**")
             
-            col1, col2, col3 = st.columns(3)
             cols = [col1, col2, col3]
             
             for i in range(3):
