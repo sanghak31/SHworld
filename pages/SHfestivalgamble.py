@@ -89,8 +89,31 @@ def show_cups_with_ball(positions=None):
                 """, unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center;'>컵 {positions[i]+1}번</p>", unsafe_allow_html=True)
 
+def show_countdown():
+    """섞기 시작 전 3초 카운트다운"""
+    countdown_container = st.empty()
+    
+    for i in range(3, 0, -1):
+        countdown_container.markdown(f"""
+        <div style='text-align: center; font-size: 80px; color: red; font-weight: bold; margin: 50px;'>
+            {i}
+        </div>
+        <h3 style='text-align: center;'>초 후에 섞기 시작!</h3>
+        """, unsafe_allow_html=True)
+        time.sleep(1)
+    
+    countdown_container.markdown("""
+    <div style='text-align: center; font-size: 60px; color: green; font-weight: bold; margin: 50px;'>
+        시작! 🔄
+    </div>
+    """, unsafe_allow_html=True)
+    time.sleep(0.5)
+
 def show_shuffle_animation():
-    """섞기 애니메이션을 보여줌"""
+    """섞기 애니메이션을 보여줌 (공은 숨김)"""
+    # 카운트다운 먼저 실행
+    show_countdown()
+    
     st.markdown("<h3 style='text-align: center;'>🔄 컵을 섞고 있습니다...</h3>", 
                 unsafe_allow_html=True)
     
@@ -106,43 +129,27 @@ def show_shuffle_animation():
     for step, move in enumerate(moves):
         pos1, pos2 = move
         
-        # 현재 상태 표시
+        # 현재 상태 표시 (공은 숨김)
         with animation_container.container():
             st.markdown(f"**{step + 1}/{len(moves)} 단계: 컵 {pos1+1}번 ↔ 컵 {pos2+1}번 교환**")
             
             col1, col2, col3 = st.columns(3)
             cols = [col1, col2, col3]
             
-            # 현재 공이 있는 위치 찾기
-            ball_current_pos = None
-            for i, original_pos in enumerate(current_positions):
-                if original_pos == st.session_state.ball_position:
-                    ball_current_pos = i
-                    break
-            
             for i in range(3):
                 with cols[i]:
                     # 교환되는 컵들 강조
                     border_color = "red" if i in [pos1, pos2] else "gray"
                     
-                    if i == ball_current_pos:
-                        st.markdown(f"""
-                        <div style='text-align: center; font-size: 50px; margin: 15px; 
-                                   border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
-                            🥤<br>🟡
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"<p style='text-align: center; color: orange;'><b>컵 {current_positions[i]+1}번</b></p>", 
-                                   unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div style='text-align: center; font-size: 50px; margin: 15px; 
-                                   border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
-                            🥤
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(f"<p style='text-align: center;'>컵 {current_positions[i]+1}번</p>", 
-                                   unsafe_allow_html=True)
+                    # 모든 컵에서 공을 숨김
+                    st.markdown(f"""
+                    <div style='text-align: center; font-size: 50px; margin: 15px; 
+                               border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
+                        🥤
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.markdown(f"<p style='text-align: center;'>컵 {current_positions[i]+1}번</p>", 
+                               unsafe_allow_html=True)
         
         # 교환 실행
         current_positions = apply_shuffle_move(current_positions, move)
