@@ -89,9 +89,9 @@ def show_cups_with_ball(positions=None):
                 """, unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center;'>컵 {positions[i]+1}번</p>", unsafe_allow_html=True)
 
-def show_shuffle_animation_inline():
-    """같은 위치에서 섞기 애니메이션을 보여줌 (공은 숨김)"""
-    # 카운트다운 먼저 실행
+def execute_shuffle_animation():
+    """같은 위치에서 섞기 애니메이션을 실행"""
+    # 카운트다운
     countdown_container = st.empty()
     
     for i in range(3, 0, -1):
@@ -124,17 +124,17 @@ def show_shuffle_animation_inline():
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # 컵 표시 영역 (기존 컵 위치 재사용)
-    col1, col2, col3 = st.columns(3)
-    cups_container = st.container()
+    # 컵 표시 영역
+    animation_container = st.empty()
     
     for step, move in enumerate(moves):
         pos1, pos2 = move
         
         # 현재 상태 표시 (공은 숨김)
-        with cups_container:
+        with animation_container.container():
             st.markdown(f"**{step + 1}/{len(moves)} 단계: 컵 {pos1+1}번 ↔ 컵 {pos2+1}번 교환**")
             
+            col1, col2, col3 = st.columns(3)
             cols = [col1, col2, col3]
             
             for i in range(3):
@@ -248,20 +248,27 @@ if not st.session_state.game_started:
         st.rerun()
 
 elif not st.session_state.shuffled:
-    # 공 위치 보여주기
+    # 공 위치 보여주기 및 섞기 과정
     st.markdown("<h3 style='text-align: center;'>🟡 노란색 공의 위치를 기억하세요!</h3>", 
-                unsafe_allow_html=True)
-    
-    show_cups_with_ball()
-    
-    st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
                 unsafe_allow_html=True)
     
     # 컵 섞기 버튼
     if st.button("🔄 컵 섞기 시작!", type="primary", use_container_width=True):
-        show_shuffle_animation()
+        # 초기 상태 표시
+        show_cups_with_ball()
+        st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
+                    unsafe_allow_html=True)
+        time.sleep(2)  # 2초간 위치 확인 시간
+        
+        # 섞기 애니메이션 실행
+        execute_shuffle_animation()
         st.session_state.shuffled = True
         st.rerun()
+    else:
+        # 버튼을 누르기 전에는 공 위치만 보여줌
+        show_cups_with_ball()
+        st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
+                    unsafe_allow_html=True)
 
 elif not st.session_state.game_finished:
     # 선택 단계
