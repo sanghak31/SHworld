@@ -254,13 +254,7 @@ elif not st.session_state.shuffled:
     
     # 컵 섞기 버튼
     if st.button("🔄 컵 섞기 시작!", type="primary", use_container_width=True):
-        # 초기 상태 표시
-        show_cups_with_ball()
-        st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
-                    unsafe_allow_html=True)
-        time.sleep(2)  # 2초간 위치 확인 시간
-        
-        # 섞기 애니메이션 실행
+        # 섞기 애니메이션 바로 실행 (컵 표시 생략)
         execute_shuffle_animation()
         st.session_state.shuffled = True
         st.rerun()
