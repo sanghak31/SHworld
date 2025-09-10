@@ -269,22 +269,6 @@ elif not st.session_state.game_finished:
     st.markdown("<p style='text-align: center; color: gray;'>위치를 선택해주세요!</p>", 
                 unsafe_allow_html=True)
     
-    # 섞기 과정 요약 표시
-    with st.expander("섞기 과정 요약 보기"):
-        st.write("**수행된 교환들:**")
-        for i, (pos1, pos2) in enumerate(st.session_state.shuffle_moves):
-            st.write(f"{i+1}. 컵 {pos1+1}번 ↔ 컵 {pos2+1}번")
-        
-        st.write(f"**시작**: 공이 컵 {st.session_state.ball_position+1}번에 있었음")
-        
-        # 최종 위치 계산
-        ball_final_pos = None
-        for i, original_pos in enumerate(st.session_state.current_positions):
-            if original_pos == st.session_state.ball_position:
-                ball_final_pos = i + 1
-                break
-        st.write(f"**현재**: 공이 위치 {ball_final_pos}번에 있음")
-    
     show_shuffled_cups()
 
 else:
