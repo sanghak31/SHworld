@@ -1,4 +1,5 @@
-import streamlit as st
+if 'shuffling_in_progress' not in st.session_state:
+    st.session_state.shuffling_in_progress = False  # 섞기 진행 중 여부import streamlit as st
 import random
 import time
 
@@ -268,6 +269,7 @@ if not st.session_state.game_started:
         st.session_state.wait_time = 2.0  # 2초로 변경
         st.session_state.shuffle_moves = generate_shuffle_moves()
         st.session_state.current_positions = [0, 1, 2]
+        st.session_state.shuffling_in_progress = False  # 초기화
         st.rerun()
 
 elif not st.session_state.shuffled:
@@ -275,17 +277,26 @@ elif not st.session_state.shuffled:
     st.markdown("<h3 style='text-align: center;'>🟡 노란색 공의 위치를 기억하세요!</h3>", 
                 unsafe_allow_html=True)
     
-    # 컵 섞기 버튼
-    if st.button("🔄 컵 섞기 시작!", type="primary", use_container_width=True):
+    # 컵 섞기 버튼 (섞는 중이 아닐 때만 활성화)
+    button_disabled = st.session_state.shuffling_in_progress
+    
+    if st.button("🔄 컵 섞기 시작!", type="primary", use_container_width=True, disabled=button_disabled):
+        # 섞기 시작 플래그 설정
+        st.session_state.shuffling_in_progress = True
+        
         # 섞기 애니메이션 바로 실행 (컵 표시 생략)
         execute_shuffle_animation()
+        
+        # 섞기 완료 후 플래그 해제 및 상태 변경
         st.session_state.shuffled = True
+        st.session_state.shuffling_in_progress = False
         st.rerun()
     else:
         # 버튼을 누르기 전에는 공 위치만 보여줌
-        show_cups_with_ball()
-        st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
-                    unsafe_allow_html=True)
+        if not st.session_state.shuffling_in_progress:
+            show_cups_with_ball()
+            st.markdown(f"<p style='text-align: center; color: blue;'><b>공은 현재 컵 {st.session_state.ball_position + 1}번에 있습니다!</b></p>", 
+                        unsafe_allow_html=True)
 
 elif not st.session_state.game_finished:
     # 선택 단계
@@ -362,6 +373,7 @@ else:
                 st.session_state.player_choice = None
                 st.session_state.shuffle_moves = generate_shuffle_moves()
                 st.session_state.current_positions = [0, 1, 2]
+                st.session_state.shuffling_in_progress = False  # 초기화
                 st.rerun()
         else:
             # 오답 시 - 단계 1로 초기화
@@ -375,6 +387,7 @@ else:
                 st.session_state.player_choice = None
                 st.session_state.shuffle_moves = generate_shuffle_moves()
                 st.session_state.current_positions = [0, 1, 2]
+                st.session_state.shuffling_in_progress = False  # 초기화
                 st.rerun()
 
 # 푸터
