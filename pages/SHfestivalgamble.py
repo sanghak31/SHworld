@@ -25,7 +25,7 @@ if 'stage' not in st.session_state:
 if 'shuffle_count' not in st.session_state:
     st.session_state.shuffle_count = 5  # 섞는 횟수
 if 'wait_time' not in st.session_state:
-    st.session_state.wait_time = 2.5  # 대기 시간
+    st.session_state.wait_time = 2.0  # 대기 시간 (2초로 변경)
 
 # 타이틀
 st.title("🥤 야바위 게임 🟡")
@@ -187,7 +187,9 @@ def execute_shuffle_animation():
     # 완료 메시지
     progress_bar.progress(1.0)
     status_text.text("섞기 완료!")
-    time.sleep(1)
+    
+    # 섞기 완료 후 추가 2초 대기 (각 단계마다 처음의 대기시간)
+    time.sleep(2.0)
 
 def show_shuffled_cups():
     """섞인 후의 컵들을 표시 (공은 숨김)"""
@@ -265,7 +267,7 @@ if not st.session_state.game_started:
         st.session_state.player_choice = None
         st.session_state.stage = 1
         st.session_state.shuffle_count = 5
-        st.session_state.wait_time = 2.5
+        st.session_state.wait_time = 2.0  # 2초로 변경
         st.session_state.shuffle_moves = generate_shuffle_moves()
         st.session_state.current_positions = [0, 1, 2]
         st.rerun()
@@ -313,7 +315,7 @@ else:
         # 다음 단계 정보
         next_stage = st.session_state.stage + 1
         next_shuffle_count = st.session_state.shuffle_count + 1
-        next_wait_time = max(0.2, st.session_state.wait_time - 0.1)
+        next_wait_time = max(0.2, st.session_state.wait_time - 0.2)  # 0.2초씩 감소
         
         st.markdown(f"""
         <div style='text-align: center; background-color: #d4edda; padding: 20px; 
@@ -355,7 +357,7 @@ else:
             if st.button("🎯 다음 단계로!", type="primary", use_container_width=True):
                 st.session_state.stage += 1
                 st.session_state.shuffle_count += 1
-                st.session_state.wait_time = max(0.2, st.session_state.wait_time - 0.1)
+                st.session_state.wait_time = max(0.2, st.session_state.wait_time - 0.2)  # 0.2초씩 감소
                 st.session_state.ball_position = random.randint(0, 2)
                 st.session_state.shuffled = False
                 st.session_state.game_finished = False
@@ -368,7 +370,7 @@ else:
             if st.button("🔄 처음부터 다시 시작!", type="primary", use_container_width=True):
                 st.session_state.stage = 1
                 st.session_state.shuffle_count = 5
-                st.session_state.wait_time = 2.5
+                st.session_state.wait_time = 2.0  # 2초로 변경
                 st.session_state.ball_position = random.randint(0, 2)
                 st.session_state.shuffled = False
                 st.session_state.game_finished = False
