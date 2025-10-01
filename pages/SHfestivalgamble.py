@@ -162,15 +162,13 @@ def execute_shuffle_animation():
                     # 교환되는 컵들 강조
                     border_color = "red" if i in [pos1, pos2] else "gray"
                     
-                    # 모든 컵에서 공을 숨김
+                    # 모든 컵에서 공을 숨김 (컵 번호도 표시 안 함)
                     st.markdown(f"""
                     <div style='text-align: center; font-size: 50px; margin: 15px; 
                                border: 3px solid {border_color}; border-radius: 10px; padding: 10px;'>
                         🥤
                     </div>
                     """, unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align: center;'>컵 {current_positions[i]+1}번</p>", 
-                               unsafe_allow_html=True)
         
         # 교환 실행
         current_positions = apply_shuffle_move(current_positions, move)
