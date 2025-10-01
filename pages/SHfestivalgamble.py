@@ -20,9 +20,29 @@ if 'shuffle_moves' not in st.session_state:
     st.session_state.shuffle_moves = []
 if 'current_positions' not in st.session_state:
     st.session_state.current_positions = [0, 1, 2]  # 각 컵의 현재 위치
+if 'stage' not in st.session_state:
+    st.session_state.stage = 1  # 현재 단계
+if 'shuffle_count' not in st.session_state:
+    st.session_state.shuffle_count = 5  # 섞는 횟수
+if 'wait_time' not in st.session_state:
+    st.session_state.wait_time = 2.5  # 대기 시간
 
 # 타이틀
 st.title("🥤 야바위 게임 🟡")
+
+# 단계 정보 표시
+col_stage1, col_stage2, col_stage3 = st.columns([1, 2, 1])
+with col_stage2:
+    st.markdown(f"""
+    <div style='text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                padding: 15px; border-radius: 10px; color: white; margin-bottom: 20px;'>
+        <h2 style='margin: 0;'>⭐ 단계 {st.session_state.stage} ⭐</h2>
+        <p style='margin: 5px 0 0 0; font-size: 14px;'>
+            섞는 횟수: {st.session_state.shuffle_count}회 | 관찰 시간: {st.session_state.wait_time}초
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # 게임 설명
@@ -36,9 +56,9 @@ with st.expander("게임 방법"):
     """)
 
 def generate_shuffle_moves():
-    """섞기 동작들을 생성"""
+    """현재 단계에 맞는 섞기 동작들을 생성"""
     moves = []
-    num_moves = random.randint(5, 8)  # 5~8회 섞기
+    num_moves = st.session_state.shuffle_count  # 현재 단계의 섞는 횟수
     
     for _ in range(num_moves):
         pos1 = random.randint(0, 2)
@@ -159,7 +179,7 @@ def execute_shuffle_animation():
         progress_bar.progress((step + 1) / len(moves))
         status_text.text(f"교환 완료: {step + 1}/{len(moves)}")
         
-        time.sleep(1.5)  # 각 단계마다 1.5초 대기
+        time.sleep(st.session_state.wait_time)  # 현재 단계의 대기 시간
     
     # 최종 위치 저장
     st.session_state.current_positions = current_positions
@@ -243,6 +263,9 @@ if not st.session_state.game_started:
         st.session_state.shuffled = False
         st.session_state.game_finished = False
         st.session_state.player_choice = None
+        st.session_state.stage = 1
+        st.session_state.shuffle_count = 5
+        st.session_state.wait_time = 2.5
         st.session_state.shuffle_moves = generate_shuffle_moves()
         st.session_state.current_positions = [0, 1, 2]
         st.rerun()
@@ -282,27 +305,77 @@ else:
             break
             
     if st.session_state.player_choice == ball_final_pos:
+        # 정답! 다음 단계로
         st.markdown("<h2 style='text-align: center; color: green;'>🎉 축하합니다! 정답입니다! 🎉</h2>", 
                     unsafe_allow_html=True)
         st.balloons()
+        
+        # 다음 단계 정보
+        next_stage = st.session_state.stage + 1
+        next_shuffle_count = st.session_state.shuffle_count + 1
+        next_wait_time = max(0.2, st.session_state.wait_time - 0.1)
+        
+        st.markdown(f"""
+        <div style='text-align: center; background-color: #d4edda; padding: 20px; 
+                    border-radius: 10px; margin: 20px 0;'>
+            <h3 style='color: #155724; margin: 0;'>다음 단계 정보</h3>
+            <p style='color: #155724; margin: 10px 0 0 0; font-size: 16px;'>
+                단계: {st.session_state.stage} → <b>{next_stage}</b><br>
+                섞는 횟수: {st.session_state.shuffle_count}회 → <b>{next_shuffle_count}회</b><br>
+                관찰 시간: {st.session_state.wait_time}초 → <b>{next_wait_time}초</b>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
     else:
+        # 오답! 단계 1로 초기화
         st.markdown("<h2 style='text-align: center; color: red;'>😅 아쉽습니다! 틀렸습니다!</h2>", 
                     unsafe_allow_html=True)
+        
+        if st.session_state.stage > 1:
+            st.markdown(f"""
+            <div style='text-align: center; background-color: #f8d7da; padding: 20px; 
+                        border-radius: 10px; margin: 20px 0;'>
+                <h3 style='color: #721c24; margin: 0;'>단계 초기화</h3>
+                <p style='color: #721c24; margin: 10px 0 0 0; font-size: 16px;'>
+                    단계 {st.session_state.stage}에서 실패했습니다.<br>
+                    다시 <b>단계 1</b>부터 시작합니다.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
     
     show_result_cups()
     
-    # 다시 시작 버튼
+    # 계속하기 또는 다시 시작 버튼
     st.markdown("---")
-    col_restart1, col_restart2, col_restart3 = st.columns([1, 2, 1])
-    with col_restart2:
-        if st.button("🔄 다시 시작하기", type="primary", use_container_width=True):
-            st.session_state.game_started = False
-            st.session_state.shuffled = False
-            st.session_state.game_finished = False
-            st.session_state.player_choice = None
-            st.session_state.shuffle_moves = []
-            st.session_state.current_positions = [0, 1, 2]
-            st.rerun()
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
+        if st.session_state.player_choice == ball_final_pos:
+            # 정답 시 - 다음 단계로
+            if st.button("🎯 다음 단계로!", type="primary", use_container_width=True):
+                st.session_state.stage += 1
+                st.session_state.shuffle_count += 1
+                st.session_state.wait_time = max(0.2, st.session_state.wait_time - 0.1)
+                st.session_state.ball_position = random.randint(0, 2)
+                st.session_state.shuffled = False
+                st.session_state.game_finished = False
+                st.session_state.player_choice = None
+                st.session_state.shuffle_moves = generate_shuffle_moves()
+                st.session_state.current_positions = [0, 1, 2]
+                st.rerun()
+        else:
+            # 오답 시 - 단계 1로 초기화
+            if st.button("🔄 처음부터 다시 시작!", type="primary", use_container_width=True):
+                st.session_state.stage = 1
+                st.session_state.shuffle_count = 5
+                st.session_state.wait_time = 2.5
+                st.session_state.ball_position = random.randint(0, 2)
+                st.session_state.shuffled = False
+                st.session_state.game_finished = False
+                st.session_state.player_choice = None
+                st.session_state.shuffle_moves = generate_shuffle_moves()
+                st.session_state.current_positions = [0, 1, 2]
+                st.rerun()
 
 # 푸터
 st.markdown("---")
