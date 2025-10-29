@@ -13,22 +13,49 @@ def get_level_config(level):
     """레벨별 설정 반환"""
     if level == 1:
         return {
-            'grid_size': 4,
+            'grid_rows': 4,
+            'grid_cols': 4,
             'pairs': 8,
             'max_failures': 10,
             'has_bomb': False
         }
     elif level == 2:
         return {
-            'grid_size': 4,
+            'grid_rows': 4,
+            'grid_cols': 4,
             'pairs': 8,
             'max_failures': 8,
             'has_bomb': False
         }
-    else:  # level >= 3
-        max_failures = max(1, 13 - (level - 3) * 2)
+    elif level == 3:
         return {
-            'grid_size': 5,
+            'grid_rows': 3,
+            'grid_cols': 5,
+            'pairs': 7,
+            'max_failures': 7,
+            'has_bomb': True
+        }
+    elif level == 4:
+        return {
+            'grid_rows': 4,
+            'grid_cols': 5,
+            'pairs': 10,
+            'max_failures': 12,
+            'has_bomb': False
+        }
+    elif level == 5:
+        return {
+            'grid_rows': 3,
+            'grid_cols': 7,
+            'pairs': 10,
+            'max_failures': 10,
+            'has_bomb': True
+        }
+    else:  # level >= 6
+        max_failures = max(1, 15 - (level - 6) * 2)
+        return {
+            'grid_rows': 5,
+            'grid_cols': 5,
             'pairs': 12,
             'max_failures': max_failures,
             'has_bomb': True
@@ -74,7 +101,8 @@ if 'bomb_indices' not in st.session_state:
 def start_game():
     """게임 시작 및 초기화"""
     config = get_level_config(st.session_state.level)
-    grid_size = config['grid_size']
+    grid_rows = config['grid_rows']
+    grid_cols = config['grid_cols']
     pairs = config['pairs']
     has_bomb = config['has_bomb']
     
@@ -92,7 +120,7 @@ def start_game():
     if has_bomb:
         bomb_indices = [i for i, card in enumerate(card_list) if card == BOMB_EMOJI]
     
-    total_cards = grid_size * grid_size
+    total_cards = grid_rows * grid_cols
     st.session_state.cards = card_list
     st.session_state.revealed = [False] * total_cards
     st.session_state.matched = [False] * total_cards
@@ -170,7 +198,7 @@ if not st.session_state.game_started:
     col1, col2 = st.columns(2)
     with col1:
         st.info(f"**레벨 {st.session_state.level} 정보**\n\n"
-                f"- 카드 크기: {config['grid_size']}x{config['grid_size']}\n"
+                f"- 카드 크기: {config['grid_rows']}x{config['grid_cols']}\n"
                 f"- 찾을 짝: {config['pairs']}개\n"
                 f"- 실패 제한: {config['max_failures']}번")
     with col2:
@@ -261,11 +289,12 @@ if st.session_state.failures >= config['max_failures']:
     st.stop()
 
 # 카드 그리드
-grid_size = config['grid_size']
-for row in range(grid_size):
-    cols = st.columns(grid_size)
-    for col in range(grid_size):
-        index = row * grid_size + col
+grid_rows = config['grid_rows']
+grid_cols = config['grid_cols']
+for row in range(grid_rows):
+    cols = st.columns(grid_cols)
+    for col in range(grid_cols):
+        index = row * grid_cols + col
         
         # 인덱스가 카드 범위를 벗어나면 건너뛰기
         if index >= len(st.session_state.cards):
