@@ -19,6 +19,8 @@ if 'cards' not in st.session_state:
     st.session_state.moves = 0
     st.session_state.matches_found = 0
     st.session_state.checking = False
+    st.session_state.game_started = False
+    st.session_state.preview_time = None
 
 def reset_game():
     st.session_state.cards = CARD_EMOJIS * 2
@@ -30,6 +32,12 @@ def reset_game():
     st.session_state.moves = 0
     st.session_state.matches_found = 0
     st.session_state.checking = False
+    st.session_state.game_started = False
+    st.session_state.preview_time = None
+
+def start_game():
+    st.session_state.game_started = True
+    st.session_state.preview_time = time.time()
 
 def card_clicked(index):
     # 이미 매칭되었거나 공개된 카드는 클릭 불가
@@ -55,6 +63,29 @@ def card_clicked(index):
 # 제목
 st.title("🎴 메모리 카드 게임")
 st.markdown("같은 그림의 카드를 찾으세요!")
+
+# 게임 시작 전
+if not st.session_state.game_started:
+    st.info("🎮 게임을 시작하면 5초 동안 모든 카드를 볼 수 있습니다!")
+    if st.button("🚀 게임 시작", use_container_width=True, type="primary"):
+        start_game()
+        st.rerun()
+    st.stop()
+
+# 미리보기 시간 확인 (5초)
+is_preview = False
+if st.session_state.preview_time is not None:
+    elapsed = time.time() - st.session_state.preview_time
+    if elapsed < 5:
+        is_preview = True
+        remaining = 5 - int(elapsed)
+        st.warning(f"⏱️ 카드를 기억하세요! {remaining}초 남음...")
+        time.sleep(0.1)
+        st.rerun()
+    elif elapsed >= 5 and st.session_state.preview_time is not None:
+        # 미리보기 종료
+        st.session_state.preview_time = None
+        st.rerun()
 
 # 게임 정보
 col1, col2, col3 = st.columns(3)
@@ -83,8 +114,8 @@ if st.session_state.checking:
         st.session_state.second_card = None
         st.session_state.checking = False
     else:
-        # 잠시 보여주고 다시 뒤집기
-        time.sleep(0.8)
+        # 1초간 보여주고 다시 뒤집기
+        time.sleep(1)
         st.session_state.revealed[first_idx] = False
         st.session_state.revealed[second_idx] = False
         st.session_state.first_card = None
@@ -98,10 +129,12 @@ for row in range(4):
     for col in range(4):
         index = row * 4 + col
         with cols[col]:
-            if st.session_state.matched[index]:
-                # 매칭된 카드는 계속 보여주기
+            # 미리보기 중이거나 매칭된 카드는 항상 표시
+            if is_preview or st.session_state.matched[index]:
+                # 매칭된 카드는 초록색으로
+                bg_color = "#90EE90" if st.session_state.matched[index] else "#FFD700"
                 st.markdown(
-                    f"<div style='background-color: #90EE90; padding: 30px; text-align: center; "
+                    f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
                     f"border-radius: 10px; font-size: 40px; margin: 5px;'>"
                     f"{st.session_state.cards[index]}</div>",
                     unsafe_allow_html=True
@@ -116,7 +149,9 @@ for row in range(4):
                 )
             else:
                 # 뒤집힌 카드 (클릭 가능)
-                if st.button("❓", key=f"card_{index}", use_container_width=True):
+                # 체크 중일 때는 클릭 비활성화
+                if st.button("❓", key=f"card_{index}", use_container_width=True, 
+                           disabled=st.session_state.checking):
                     card_clicked(index)
                     st.rerun()
 
