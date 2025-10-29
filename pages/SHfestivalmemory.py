@@ -27,8 +27,8 @@ if 'first_card' not in st.session_state:
 if 'second_card' not in st.session_state:
     st.session_state.second_card = None
 
-if 'moves' not in st.session_state:
-    st.session_state.moves = 0
+if 'failures' not in st.session_state:
+    st.session_state.failures = 0
 
 if 'matches_found' not in st.session_state:
     st.session_state.matches_found = 0
@@ -47,7 +47,7 @@ def start_game():
     st.session_state.matched = [False] * 16
     st.session_state.first_card = None
     st.session_state.second_card = None
-    st.session_state.moves = 0
+    st.session_state.failures = 0
     st.session_state.matches_found = 0
     st.session_state.game_started = True
     st.session_state.preview_end_time = time.time() + 5  # 5초 후
@@ -61,7 +61,7 @@ def reset_game():
     st.session_state.matched = []
     st.session_state.first_card = None
     st.session_state.second_card = None
-    st.session_state.moves = 0
+    st.session_state.failures = 0
     st.session_state.matches_found = 0
     st.session_state.preview_end_time = None
     st.session_state.show_cards_until = None
@@ -82,7 +82,6 @@ def card_clicked(index):
     elif st.session_state.second_card is None:
         st.session_state.second_card = index
         st.session_state.revealed[index] = True
-        st.session_state.moves += 1
         st.session_state.show_cards_until = time.time() + 1  # 1초간 보여주기
 
 # 제목
@@ -120,12 +119,13 @@ if st.session_state.show_cards_until is not None:
         second_idx = st.session_state.second_card
         
         if st.session_state.cards[first_idx] == st.session_state.cards[second_idx]:
-            # 매칭 성공
+            # 매칭 성공 - 실패 횟수 증가 없음
             st.session_state.matched[first_idx] = True
             st.session_state.matched[second_idx] = True
             st.session_state.matches_found += 1
         else:
-            # 매칭 실패 - 카드 다시 뒤집기
+            # 매칭 실패 - 실패 횟수 증가
+            st.session_state.failures += 1
             st.session_state.revealed[first_idx] = False
             st.session_state.revealed[second_idx] = False
         
