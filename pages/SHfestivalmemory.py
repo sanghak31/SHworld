@@ -12,14 +12,32 @@ CARD_EMOJIS = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼"]
 if 'cards' not in st.session_state:
     st.session_state.cards = CARD_EMOJIS * 2
     random.shuffle(st.session_state.cards)
+
+if 'revealed' not in st.session_state:
     st.session_state.revealed = [False] * 16
+
+if 'matched' not in st.session_state:
     st.session_state.matched = [False] * 16
+
+if 'first_card' not in st.session_state:
     st.session_state.first_card = None
+
+if 'second_card' not in st.session_state:
     st.session_state.second_card = None
+
+if 'moves' not in st.session_state:
     st.session_state.moves = 0
+
+if 'matches_found' not in st.session_state:
     st.session_state.matches_found = 0
+
+if 'checking' not in st.session_state:
     st.session_state.checking = False
+
+if 'game_started' not in st.session_state:
     st.session_state.game_started = False
+
+if 'preview_time' not in st.session_state:
     st.session_state.preview_time = None
 
 def reset_game():
