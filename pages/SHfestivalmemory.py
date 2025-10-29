@@ -137,7 +137,7 @@ if st.session_state.show_cards_until is not None:
 # 게임 정보
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("이동 횟수", st.session_state.moves)
+    st.metric("실패 횟수", f"{st.session_state.failures}/10")
 with col2:
     st.metric("찾은 짝", f"{st.session_state.matches_found}/8")
 with col3:
@@ -146,6 +146,14 @@ with col3:
         st.rerun()
 
 st.markdown("---")
+
+# 게임 실패 체크
+if st.session_state.failures >= 10:
+    st.error("💀 게임 오버! 실패 횟수가 10번을 초과했습니다!")
+    if st.button("🎮 다시 도전하기", type="primary", use_container_width=True):
+        reset_game()
+        st.rerun()
+    st.stop()
 
 # 카드 그리드 (4x4)
 for row in range(4):
@@ -184,9 +192,9 @@ if is_preview or is_showing_cards:
     st.rerun()
 
 # 게임 클리어
-if st.session_state.matches_found == 8:
+if st.session_state.matches_found == 8 and st.session_state.failures < 10:
     st.balloons()
-    st.success(f"🎉 축하합니다! {st.session_state.moves}번 만에 모든 짝을 찾았습니다!")
+    st.success(f"🎉 축하합니다! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
     if st.button("🎮 다시 플레이", type="primary"):
         reset_game()
         st.rerun()
