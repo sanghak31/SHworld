@@ -54,6 +54,16 @@ def reset_game():
     st.session_state.preview_time = None
 
 def start_game():
+    # 게임 초기화
+    st.session_state.cards = CARD_EMOJIS * 2
+    random.shuffle(st.session_state.cards)
+    st.session_state.revealed = [False] * 16
+    st.session_state.matched = [False] * 16
+    st.session_state.first_card = None
+    st.session_state.second_card = None
+    st.session_state.moves = 0
+    st.session_state.matches_found = 0
+    st.session_state.checking = False
     st.session_state.game_started = True
     st.session_state.preview_time = time.time()
 
@@ -77,6 +87,8 @@ def card_clicked(index):
         st.session_state.second_card = index
         st.session_state.moves += 1
         st.session_state.checking = True
+        # 두 번째 카드도 즉시 공개
+        st.session_state.revealed[index] = True
 
 # 제목
 st.title("🎴 메모리 카드 게임")
@@ -97,10 +109,10 @@ if st.session_state.preview_time is not None:
     if elapsed < 5:
         is_preview = True
         remaining = 5 - int(elapsed)
-        st.warning(f"⏱️ 카드를 기억하세요! {remaining}초 남음...")
+        st.warning(f"⏱️ 카드를 기억하세요! {remaining + 1}초 남음...")
         time.sleep(0.1)
         st.rerun()
-    elif elapsed >= 5 and st.session_state.preview_time is not None:
+    else:
         # 미리보기 종료
         st.session_state.preview_time = None
         st.rerun()
@@ -120,8 +132,13 @@ st.markdown("---")
 
 # 두 카드가 선택되었을 때 매칭 확인
 if st.session_state.checking:
+    # 두 카드를 먼저 보여주기 위해 화면 갱신
     first_idx = st.session_state.first_card
     second_idx = st.session_state.second_card
+    
+    # 두 카드 모두 공개 상태로 표시
+    st.session_state.revealed[first_idx] = True
+    st.session_state.revealed[second_idx] = True
     
     # 매칭 확인
     if st.session_state.cards[first_idx] == st.session_state.cards[second_idx]:
@@ -140,38 +157,6 @@ if st.session_state.checking:
         st.session_state.second_card = None
         st.session_state.checking = False
     st.rerun()
-
-# 카드 그리드 (4x4)
-for row in range(4):
-    cols = st.columns(4)
-    for col in range(4):
-        index = row * 4 + col
-        with cols[col]:
-            # 미리보기 중이거나 매칭된 카드는 항상 표시
-            if is_preview or st.session_state.matched[index]:
-                # 매칭된 카드는 초록색으로
-                bg_color = "#90EE90" if st.session_state.matched[index] else "#FFD700"
-                st.markdown(
-                    f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
-                    f"border-radius: 10px; font-size: 40px; margin: 5px;'>"
-                    f"{st.session_state.cards[index]}</div>",
-                    unsafe_allow_html=True
-                )
-            elif st.session_state.revealed[index]:
-                # 공개된 카드
-                st.markdown(
-                    f"<div style='background-color: #FFD700; padding: 30px; text-align: center; "
-                    f"border-radius: 10px; font-size: 40px; margin: 5px;'>"
-                    f"{st.session_state.cards[index]}</div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                # 뒤집힌 카드 (클릭 가능)
-                # 체크 중일 때는 클릭 비활성화
-                if st.button("❓", key=f"card_{index}", use_container_width=True, 
-                           disabled=st.session_state.checking):
-                    card_clicked(index)
-                    st.rerun()
 
 # 게임 클리어
 if st.session_state.matches_found == 8:
