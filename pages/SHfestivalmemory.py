@@ -10,6 +10,8 @@ CARD_EMOJIS = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "
 BOMB_EMOJI = "💣"
 ICE_EMOJI = "❄️"
 LIGHT_EMOJI = "✨"
+WITCH_EMOJI = "🧙"
+LOCK_EMOJI = "🔒"
 
 def get_level_config(level):
     """레벨별 설정 반환"""
@@ -21,7 +23,9 @@ def get_level_config(level):
             'max_failures': 5,
             'bombs': 0,
             'has_ice': False,
-            'has_light': False
+            'has_light': False,
+            'has_witch': False,
+            'has_lock': False
         }
     elif level == 2:
         return {
@@ -31,58 +35,70 @@ def get_level_config(level):
             'max_failures': 8,
             'bombs': 1,
             'has_ice': False,
-            'has_light': False
+            'has_light': False,
+            'has_witch': False,
+            'has_lock': False
         }
     elif level == 3:
         return {
             'grid_rows': 4,
             'grid_cols': 4,
             'pairs': 7,
-            'max_failures': 10,
+            'max_failures': 8,
             'bombs': 2,
-            'has_ice': False,
-            'has_light': False
+            'has_ice': True,
+            'has_light': False,
+            'has_witch': False,
+            'has_lock': False
         }
     elif level == 4:
         return {
             'grid_rows': 4,
             'grid_cols': 5,
-            'pairs': 9,
-            'max_failures': 10,
-            'bombs': 2,
+            'pairs': 8,
+            'max_failures': 8,
+            'bombs': 4,
             'has_ice': True,
-            'has_light': False
+            'has_light': True,
+            'has_witch': False,
+            'has_lock': False
         }
     elif level == 5:
         return {
             'grid_rows': 3,
             'grid_cols': 7,
             'pairs': 9,
-            'max_failures': 8,
+            'max_failures': 7,
             'bombs': 3,
             'has_ice': True,
-            'has_light': False
+            'has_light': True,
+            'has_witch': True,
+            'has_lock': False
         }
     elif level == 6:
         return {
             'grid_rows': 5,
             'grid_cols': 5,
-            'pairs': 12,
-            'max_failures': 12,
-            'bombs': 1,
-            'has_ice': True,
-            'has_light': True
+            'pairs': 11,
+            'max_failures': 8,
+            'bombs': 3,
+            'has_ice': False,
+            'has_light': True,
+            'has_witch': True,
+            'has_lock': True
         }
     else:  # level >= 7
-        max_failures = max(1, 12 - (level - 6) * 2)
+        max_failures = max(1, 8 - (level - 6) * 2)
         return {
             'grid_rows': 5,
             'grid_cols': 5,
-            'pairs': 12,
+            'pairs': 11,
             'max_failures': max_failures,
-            'bombs': 1,
-            'has_ice': True,
-            'has_light': True
+            'bombs': 3,
+            'has_ice': False,
+            'has_light': True,
+            'has_witch': True,
+            'has_lock': True
         }
 
 # 세션 상태 초기화
@@ -128,8 +144,23 @@ if 'ice_indices' not in st.session_state:
 if 'light_indices' not in st.session_state:
     st.session_state.light_indices = []
 
+if 'lock_indices' not in st.session_state:
+    st.session_state.lock_indices = []
+
+if 'witch_indices' not in st.session_state:
+    st.session_state.witch_indices = []
+
 if 'bombs_revealed' not in st.session_state:
     st.session_state.bombs_revealed = False
+
+if 'lock_opened' not in st.session_state:
+    st.session_state.lock_opened = False
+
+if 'witch_defeated' not in st.session_state:
+    st.session_state.witch_defeated = False
+
+if 'edge_indices' not in st.session_state:
+    st.session_state.edge_indices = []
 
 def start_game():
     """게임 시작 및 초기화"""
@@ -140,9 +171,10 @@ def start_game():
     bombs = config['bombs']
     has_ice = config['has_ice']
     has_light = config['has_light']
+    has_witch = config['has_witch']
+    has_lock = config['has_lock']
     
     # 카드 생성
-    actual_pairs = pairs
     card_list = []
     
     # 특수 카드 개수 계산
@@ -151,28 +183,65 @@ def start_game():
         special_pairs += 1
     if has_light:
         special_pairs += 1
+    if has_witch:
+        special_pairs += 1
+    if has_lock:
+        special_pairs += 1
     
     actual_pairs = pairs - special_pairs
     card_list = CARD_EMOJIS[:actual_pairs] * 2
     
-    # 얼음 카드 추가
+    # 특수 카드 추가
     if has_ice:
         card_list.extend([ICE_EMOJI, ICE_EMOJI])
-    
-    # 빛 카드 추가
     if has_light:
         card_list.extend([LIGHT_EMOJI, LIGHT_EMOJI])
+    if has_witch:
+        card_list.extend([WITCH_EMOJI, WITCH_EMOJI])
+    if has_lock:
+        card_list.extend([LOCK_EMOJI, LOCK_EMOJI])
     
     # 폭탄 카드 추가
     for _ in range(bombs):
         card_list.append(BOMB_EMOJI)
     
+    # 카드 섞기
     random.shuffle(card_list)
+    
+    # 자물쇠 카드가 가장자리에 있으면 다시 섞기
+    if has_lock:
+        max_attempts = 100
+        for _ in range(max_attempts):
+            lock_indices_temp = [i for i, card in enumerate(card_list) if card == LOCK_EMOJI]
+            edge_indices_temp = []
+            
+            # 가장자리 인덱스 계산
+            for i in range(len(card_list)):
+                row = i // grid_cols
+                col = i % grid_cols
+                if row == 0 or row == grid_rows - 1 or col == 0 or col == grid_cols - 1:
+                    edge_indices_temp.append(i)
+            
+            # 자물쇠가 가장자리에 있는지 확인
+            lock_on_edge = any(idx in edge_indices_temp for idx in lock_indices_temp)
+            if not lock_on_edge:
+                break
+            random.shuffle(card_list)
     
     # 특수 카드 위치 저장
     bomb_indices = [i for i, card in enumerate(card_list) if card == BOMB_EMOJI]
     ice_indices = [i for i, card in enumerate(card_list) if card == ICE_EMOJI]
     light_indices = [i for i, card in enumerate(card_list) if card == LIGHT_EMOJI]
+    witch_indices = [i for i, card in enumerate(card_list) if card == WITCH_EMOJI]
+    lock_indices = [i for i, card in enumerate(card_list) if card == LOCK_EMOJI]
+    
+    # 가장자리 인덱스 저장
+    edge_indices = []
+    for i in range(len(card_list)):
+        row = i // grid_cols
+        col = i % grid_cols
+        if row == 0 or row == grid_rows - 1 or col == 0 or col == grid_cols - 1:
+            edge_indices.append(i)
     
     total_cards = grid_rows * grid_cols
     st.session_state.cards = card_list
@@ -188,7 +257,12 @@ def start_game():
     st.session_state.bomb_indices = bomb_indices
     st.session_state.ice_indices = ice_indices
     st.session_state.light_indices = light_indices
+    st.session_state.witch_indices = witch_indices
+    st.session_state.lock_indices = lock_indices
+    st.session_state.edge_indices = edge_indices
     st.session_state.bombs_revealed = False
+    st.session_state.lock_opened = False
+    st.session_state.witch_defeated = False
 
 def stop_preview():
     """미리보기 종료"""
@@ -210,7 +284,12 @@ def reset_to_level_1():
     st.session_state.bomb_indices = []
     st.session_state.ice_indices = []
     st.session_state.light_indices = []
+    st.session_state.witch_indices = []
+    st.session_state.lock_indices = []
+    st.session_state.edge_indices = []
     st.session_state.bombs_revealed = False
+    st.session_state.lock_opened = False
+    st.session_state.witch_defeated = False
 
 def next_level():
     """다음 레벨로 진행"""
@@ -228,7 +307,12 @@ def next_level():
     st.session_state.bomb_indices = []
     st.session_state.ice_indices = []
     st.session_state.light_indices = []
+    st.session_state.witch_indices = []
+    st.session_state.lock_indices = []
+    st.session_state.edge_indices = []
     st.session_state.bombs_revealed = False
+    st.session_state.lock_opened = False
+    st.session_state.witch_defeated = False
 
 def card_clicked(index):
     """카드 클릭 처리"""
@@ -241,6 +325,11 @@ def card_clicked(index):
     # 폭탄이 공개된 상태면 폭탄 클릭 무시
     if st.session_state.bombs_revealed and index in st.session_state.bomb_indices:
         return
+    
+    # 자물쇠가 열리지 않았고 가장자리 카드면 클릭 무시 (단, 자물쇠 카드는 예외)
+    if not st.session_state.lock_opened and index in st.session_state.edge_indices:
+        if index not in st.session_state.lock_indices:
+            return
     
     # 첫 번째 카드 선택
     if st.session_state.first_card is None:
@@ -277,17 +366,23 @@ if not st.session_state.game_started:
         if config['has_ice']:
             info_text += f"- 얼음 카드: 1쌍\n"
         if config['has_light']:
-            info_text += f"- 빛 카드: 1쌍"
+            info_text += f"- 빛 카드: 1쌍\n"
+        if config['has_witch']:
+            info_text += f"- 마녀 카드: 1쌍\n"
+        if config['has_lock']:
+            info_text += f"- 자물쇠 카드: 1쌍"
         st.info(info_text)
     with col2:
-        if config['bombs'] > 0:
+        if st.session_state.level == 2 and config['bombs'] > 0:
             st.warning("⚠️ **폭탄 카드는 건드릴시 바로 실패합니다.**")
-        if config['has_ice']:
+        if st.session_state.level == 3 and config['has_ice']:
             st.success("❄️ **얼음 카드 쌍을 맞추면 폭탄 위치가 공개됩니다!**")
-        if config['has_light']:
+        if st.session_state.level == 4 and config['has_light']:
             st.success("✨ **빛 카드 쌍을 맞추면 다른 카드 1쌍이 자동으로 맞춰집니다!**")
-        if config['bombs'] == 0 and not config['has_ice'] and not config['has_light']:
-            st.success("✅ 이 레벨은 특수 카드가 없습니다!")
+        if st.session_state.level == 5 and config['has_witch']:
+            st.warning("🧙 **마녀 카드를 먼저 처치해야 특수 카드 효과가 발동됩니다!**")
+        if st.session_state.level == 6 and config['has_lock']:
+            st.warning("🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**")
     
     st.markdown("---")
     st.info("🎮 게임을 시작하면 모든 카드를 볼 수 있습니다!")
@@ -333,30 +428,42 @@ if st.session_state.show_cards_until is not None:
                 st.session_state.matched[second_idx] = True
                 st.session_state.matches_found += 1
                 
-                # 얼음 카드를 매칭한 경우 폭탄 공개
-                if first_idx in st.session_state.ice_indices:
-                    st.session_state.bombs_revealed = True
+                # 마녀 카드를 매칭한 경우
+                if first_idx in st.session_state.witch_indices:
+                    st.session_state.witch_defeated = True
                 
-                # 빛 카드를 매칭한 경우 다른 카드 1쌍 자동 매칭
-                if first_idx in st.session_state.light_indices:
-                    # 아직 매칭되지 않은 일반 카드 찾기
-                    unmatched_cards = {}
-                    for i, card in enumerate(st.session_state.cards):
-                        if (not st.session_state.matched[i] and 
-                            i not in st.session_state.bomb_indices and
-                            i not in st.session_state.ice_indices and
-                            i not in st.session_state.light_indices):
-                            if card not in unmatched_cards:
-                                unmatched_cards[card] = []
-                            unmatched_cards[card].append(i)
+                # 자물쇠 카드를 매칭한 경우
+                if first_idx in st.session_state.lock_indices:
+                    st.session_state.lock_opened = True
+                
+                # 마녀가 처치되었거나 마녀가 없는 경우에만 특수 효과 발동
+                if st.session_state.witch_defeated or len(st.session_state.witch_indices) == 0:
+                    # 얼음 카드를 매칭한 경우 폭탄 공개
+                    if first_idx in st.session_state.ice_indices:
+                        st.session_state.bombs_revealed = True
                     
-                    # 쌍이 있는 카드 자동 매칭
-                    for card, indices in unmatched_cards.items():
-                        if len(indices) >= 2:
-                            st.session_state.matched[indices[0]] = True
-                            st.session_state.matched[indices[1]] = True
-                            st.session_state.matches_found += 1
-                            break
+                    # 빛 카드를 매칭한 경우 다른 카드 1쌍 자동 매칭
+                    if first_idx in st.session_state.light_indices:
+                        # 아직 매칭되지 않은 일반 카드 찾기
+                        unmatched_cards = {}
+                        for i, card in enumerate(st.session_state.cards):
+                            if (not st.session_state.matched[i] and 
+                                i not in st.session_state.bomb_indices and
+                                i not in st.session_state.ice_indices and
+                                i not in st.session_state.light_indices and
+                                i not in st.session_state.witch_indices and
+                                i not in st.session_state.lock_indices):
+                                if card not in unmatched_cards:
+                                    unmatched_cards[card] = []
+                                unmatched_cards[card].append(i)
+                        
+                        # 쌍이 있는 카드 자동 매칭
+                        for card, indices in unmatched_cards.items():
+                            if len(indices) >= 2:
+                                st.session_state.matched[indices[0]] = True
+                                st.session_state.matched[indices[1]] = True
+                                st.session_state.matches_found += 1
+                                break
             else:
                 # 매칭 실패 - 실패 횟수 증가
                 st.session_state.failures += 1
@@ -383,21 +490,26 @@ st.markdown("---")
 
 # 게임 정보 표시
 status_messages = []
-if config['bombs'] > 0:
-    if st.session_state.bombs_revealed:
-        status_messages.append("❄️ **얼음 카드 효과 발동! 폭탄 위치가 공개되었습니다!**")
+
+if config['has_witch']:
+    if st.session_state.witch_defeated:
+        status_messages.append(("success", "🧙 **마녀를 처치했습니다! 이제 특수 카드 효과가 발동됩니다!**"))
     else:
-        status_messages.append("⚠️ **폭탄 카드는 건드릴시 바로 실패합니다.**")
-        if config['has_ice']:
-            status_messages.append("💡 **힌트: 얼음 카드를 맞추면 폭탄 위치를 알 수 있습니다!**")
+        status_messages.append(("warning", "🧙 **마녀 카드를 먼저 처치해야 특수 카드 효과가 발동됩니다!**"))
 
-if config['has_light']:
-    status_messages.append("💡 **힌트: 빛 카드를 맞추면 다른 카드가 자동으로 맞춰집니다!**")
+if config['has_lock']:
+    if st.session_state.lock_opened:
+        status_messages.append(("success", "🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**"))
+    else:
+        status_messages.append(("warning", "🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**"))
 
-for msg in status_messages:
-    if "❄️" in msg or "✨" in msg:
+if config['bombs'] > 0 and st.session_state.bombs_revealed:
+    status_messages.append(("success", "❄️ **얼음 카드 효과 발동! 폭탄 위치가 공개되었습니다!**"))
+
+for msg_type, msg in status_messages:
+    if msg_type == "success":
         st.success(msg)
-    elif "💡" in msg:
+    elif msg_type == "info":
         st.info(msg)
     else:
         st.warning(msg)
@@ -436,6 +548,8 @@ for row in range(grid_rows):
                 # 폭탄은 빨간색 (공개되었거나 미리보기 중일 때)
                 # 얼음은 하늘색
                 # 빛은 연한 노란색
+                # 마녀는 보라색
+                # 자물쇠는 회색
                 # 나머지는 노란색
                 if st.session_state.matched[index]:
                     bg_color = "#90EE90"
@@ -445,6 +559,10 @@ for row in range(grid_rows):
                     bg_color = "#87CEEB"
                 elif index in st.session_state.light_indices:
                     bg_color = "#FFFFE0"
+                elif index in st.session_state.witch_indices:
+                    bg_color = "#9370DB"
+                elif index in st.session_state.lock_indices:
+                    bg_color = "#D3D3D3"
                 else:
                     bg_color = "#FFD700"
                     
@@ -467,8 +585,14 @@ for row in range(grid_rows):
                     )
                 else:
                     # 뒤집힌 카드 (클릭 가능)
-                    # 미리보기 중이거나 카드 보여주는 중이면 클릭 비활성화
-                    disabled = is_preview or is_showing_cards or st.session_state.second_card is not None
+                    # 자물쇠가 열리지 않았고 가장자리이며 자물쇠 카드가 아닌 경우 비활성화
+                    is_locked_edge = (not st.session_state.lock_opened and 
+                                     index in st.session_state.edge_indices and 
+                                     index not in st.session_state.lock_indices and
+                                     len(st.session_state.lock_indices) > 0)
+                    
+                    disabled = is_preview or is_showing_cards or st.session_state.second_card is not None or is_locked_edge
+                    
                     if st.button("❓", key=f"card_{index}", use_container_width=True, disabled=disabled):
                         card_clicked(index)
                         st.rerun()
