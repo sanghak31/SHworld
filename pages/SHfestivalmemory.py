@@ -435,7 +435,7 @@ for row in range(grid_rows):
                 # 매칭된 카드는 초록색
                 # 폭탄은 빨간색 (공개되었거나 미리보기 중일 때)
                 # 얼음은 하늘색
-                # 빛은 금색
+                # 빛은 연한 노란색
                 # 나머지는 노란색
                 if st.session_state.matched[index]:
                     bg_color = "#90EE90"
@@ -444,9 +444,9 @@ for row in range(grid_rows):
                 elif index in st.session_state.ice_indices:
                     bg_color = "#87CEEB"
                 elif index in st.session_state.light_indices:
-                    bg_color = "#FFD700"
+                    bg_color = "#FFFFE0"
                 else:
-                    bg_color = "#FFA07A"
+                    bg_color = "#FFD700"
                     
                 st.markdown(
                     f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
