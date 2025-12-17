@@ -2,6 +2,7 @@ import streamlit as st
 import random
 import time
 
+
 # 페이지 설정
 st.set_page_config(page_title="메모리 카드 게임", page_icon="🎴", layout="centered")
 
