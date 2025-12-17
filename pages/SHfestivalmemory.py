@@ -89,8 +89,8 @@ if 'failures' not in st.session_state:
 if 'matches_found' not in st.session_state:
     st.session_state.matches_found = 0
 
-if 'preview_end_time' not in st.session_state:
-    st.session_state.preview_end_time = None
+if 'is_previewing' not in st.session_state:
+    st.session_state.is_previewing = False
 
 if 'show_cards_until' not in st.session_state:
     st.session_state.show_cards_until = None
@@ -129,9 +129,13 @@ def start_game():
     st.session_state.failures = 0
     st.session_state.matches_found = 0
     st.session_state.game_started = True
-    st.session_state.preview_end_time = time.time() + 5  # 5초 후
+    st.session_state.is_previewing = True
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = bomb_indices
+
+def stop_preview():
+    """미리보기 종료"""
+    st.session_state.is_previewing = False
 
 def reset_to_level_1():
     """레벨 1로 리셋"""
@@ -144,7 +148,7 @@ def reset_to_level_1():
     st.session_state.second_card = None
     st.session_state.failures = 0
     st.session_state.matches_found = 0
-    st.session_state.preview_end_time = None
+    st.session_state.is_previewing = False
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = []
 
@@ -159,7 +163,7 @@ def next_level():
     st.session_state.second_card = None
     st.session_state.failures = 0
     st.session_state.matches_found = 0
-    st.session_state.preview_end_time = None
+    st.session_state.is_previewing = False
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = []
 
@@ -208,7 +212,7 @@ if not st.session_state.game_started:
             st.success("✅ 이 레벨은 폭탄이 없습니다!")
     
     st.markdown("---")
-    st.info("🎮 게임을 시작하면 5초 동안 모든 카드를 볼 수 있습니다!")
+    st.info("🎮 게임을 시작하면 모든 카드를 볼 수 있습니다!")
     
     if st.button("🚀 게임 시작", use_container_width=True, type="primary"):
         start_game()
@@ -216,15 +220,14 @@ if not st.session_state.game_started:
     st.stop()
 
 # 미리보기 중인지 확인
-is_preview = False
-if st.session_state.preview_end_time is not None:
-    current_time = time.time()
-    if current_time < st.session_state.preview_end_time:
-        is_preview = True
-        remaining = int(st.session_state.preview_end_time - current_time) + 1
-        st.warning(f"⏱️ 카드를 기억하세요! {remaining}초 남음...")
-    else:
-        st.session_state.preview_end_time = None
+is_preview = st.session_state.is_previewing
+
+# 미리보기 중이면 준비 완료 버튼 표시
+if is_preview:
+    st.warning("⏱️ 카드 위치를 기억하세요!")
+    if st.button("✅ 맞출 준비가 되었습니다!", use_container_width=True, type="primary"):
+        stop_preview()
+        st.rerun()
 
 # 두 카드를 보여주는 중인지 확인
 is_showing_cards = False
@@ -333,7 +336,7 @@ for row in range(grid_rows):
                     st.rerun()
 
 # 미리보기나 카드 보여주기 중이면 자동 새로고침
-if is_preview or is_showing_cards:
+if is_showing_cards:
     time.sleep(0.1)
     st.rerun()
 
