@@ -9,6 +9,7 @@ st.set_page_config(page_title="메모리 카드 게임", page_icon="🎴", layou
 CARD_EMOJIS = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐸", "🐵", "🦁", "🐯"]
 BOMB_EMOJI = "💣"
 ICE_EMOJI = "❄️"
+LIGHT_EMOJI = "✨"
 
 def get_level_config(level):
     """레벨별 설정 반환"""
@@ -19,7 +20,8 @@ def get_level_config(level):
             'pairs': 2,
             'max_failures': 5,
             'bombs': 0,
-            'has_ice': False
+            'has_ice': False,
+            'has_light': False
         }
     elif level == 2:
         return {
@@ -28,16 +30,18 @@ def get_level_config(level):
             'pairs': 4,
             'max_failures': 8,
             'bombs': 1,
-            'has_ice': False
+            'has_ice': False,
+            'has_light': False
         }
     elif level == 3:
         return {
             'grid_rows': 4,
             'grid_cols': 4,
-            'pairs': 8,
+            'pairs': 7,
             'max_failures': 10,
-            'bombs': 0,
-            'has_ice': False
+            'bombs': 2,
+            'has_ice': False,
+            'has_light': False
         }
     elif level == 4:
         return {
@@ -46,26 +50,39 @@ def get_level_config(level):
             'pairs': 9,
             'max_failures': 10,
             'bombs': 2,
-            'has_ice': True
+            'has_ice': True,
+            'has_light': False
         }
     elif level == 5:
         return {
             'grid_rows': 3,
             'grid_cols': 7,
-            'pairs': 10,
-            'max_failures': 10,
-            'bombs': 1,
-            'has_ice': False
+            'pairs': 9,
+            'max_failures': 8,
+            'bombs': 3,
+            'has_ice': True,
+            'has_light': False
         }
-    else:  # level >= 6
-        max_failures = max(1, 15 - (level - 6) * 2)
+    elif level == 6:
+        return {
+            'grid_rows': 5,
+            'grid_cols': 5,
+            'pairs': 12,
+            'max_failures': 12,
+            'bombs': 1,
+            'has_ice': True,
+            'has_light': True
+        }
+    else:  # level >= 7
+        max_failures = max(1, 12 - (level - 6) * 2)
         return {
             'grid_rows': 5,
             'grid_cols': 5,
             'pairs': 12,
             'max_failures': max_failures,
             'bombs': 1,
-            'has_ice': False
+            'has_ice': True,
+            'has_light': True
         }
 
 # 세션 상태 초기화
@@ -108,6 +125,9 @@ if 'bomb_indices' not in st.session_state:
 if 'ice_indices' not in st.session_state:
     st.session_state.ice_indices = []
 
+if 'light_indices' not in st.session_state:
+    st.session_state.light_indices = []
+
 if 'bombs_revealed' not in st.session_state:
     st.session_state.bombs_revealed = False
 
@@ -119,16 +139,29 @@ def start_game():
     pairs = config['pairs']
     bombs = config['bombs']
     has_ice = config['has_ice']
+    has_light = config['has_light']
     
     # 카드 생성
     actual_pairs = pairs
+    card_list = []
+    
+    # 특수 카드 개수 계산
+    special_pairs = 0
     if has_ice:
-        # 얼음 카드 1쌍 추가
-        actual_pairs = pairs - 1
-        card_list = CARD_EMOJIS[:actual_pairs] * 2
+        special_pairs += 1
+    if has_light:
+        special_pairs += 1
+    
+    actual_pairs = pairs - special_pairs
+    card_list = CARD_EMOJIS[:actual_pairs] * 2
+    
+    # 얼음 카드 추가
+    if has_ice:
         card_list.extend([ICE_EMOJI, ICE_EMOJI])
-    else:
-        card_list = CARD_EMOJIS[:pairs] * 2
+    
+    # 빛 카드 추가
+    if has_light:
+        card_list.extend([LIGHT_EMOJI, LIGHT_EMOJI])
     
     # 폭탄 카드 추가
     for _ in range(bombs):
@@ -136,11 +169,10 @@ def start_game():
     
     random.shuffle(card_list)
     
-    # 폭탄 위치 저장
+    # 특수 카드 위치 저장
     bomb_indices = [i for i, card in enumerate(card_list) if card == BOMB_EMOJI]
-    
-    # 얼음 위치 저장
     ice_indices = [i for i, card in enumerate(card_list) if card == ICE_EMOJI]
+    light_indices = [i for i, card in enumerate(card_list) if card == LIGHT_EMOJI]
     
     total_cards = grid_rows * grid_cols
     st.session_state.cards = card_list
@@ -155,6 +187,7 @@ def start_game():
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = bomb_indices
     st.session_state.ice_indices = ice_indices
+    st.session_state.light_indices = light_indices
     st.session_state.bombs_revealed = False
 
 def stop_preview():
@@ -176,6 +209,7 @@ def reset_to_level_1():
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = []
     st.session_state.ice_indices = []
+    st.session_state.light_indices = []
     st.session_state.bombs_revealed = False
 
 def next_level():
@@ -193,6 +227,7 @@ def next_level():
     st.session_state.show_cards_until = None
     st.session_state.bomb_indices = []
     st.session_state.ice_indices = []
+    st.session_state.light_indices = []
     st.session_state.bombs_revealed = False
 
 def card_clicked(index):
@@ -240,15 +275,19 @@ if not st.session_state.game_started:
         if config['bombs'] > 0:
             info_text += f"- 폭탄: {config['bombs']}개\n"
         if config['has_ice']:
-            info_text += f"- 얼음 카드: 1쌍"
+            info_text += f"- 얼음 카드: 1쌍\n"
+        if config['has_light']:
+            info_text += f"- 빛 카드: 1쌍"
         st.info(info_text)
     with col2:
         if config['bombs'] > 0:
             st.warning("⚠️ **폭탄 카드는 건드릴시 바로 실패합니다.**")
         if config['has_ice']:
             st.success("❄️ **얼음 카드 쌍을 맞추면 폭탄 위치가 공개됩니다!**")
-        if config['bombs'] == 0 and not config['has_ice']:
-            st.success("✅ 이 레벨은 폭탄이 없습니다!")
+        if config['has_light']:
+            st.success("✨ **빛 카드 쌍을 맞추면 다른 카드 1쌍이 자동으로 맞춰집니다!**")
+        if config['bombs'] == 0 and not config['has_ice'] and not config['has_light']:
+            st.success("✅ 이 레벨은 특수 카드가 없습니다!")
     
     st.markdown("---")
     st.info("🎮 게임을 시작하면 모든 카드를 볼 수 있습니다!")
@@ -297,6 +336,27 @@ if st.session_state.show_cards_until is not None:
                 # 얼음 카드를 매칭한 경우 폭탄 공개
                 if first_idx in st.session_state.ice_indices:
                     st.session_state.bombs_revealed = True
+                
+                # 빛 카드를 매칭한 경우 다른 카드 1쌍 자동 매칭
+                if first_idx in st.session_state.light_indices:
+                    # 아직 매칭되지 않은 일반 카드 찾기
+                    unmatched_cards = {}
+                    for i, card in enumerate(st.session_state.cards):
+                        if (not st.session_state.matched[i] and 
+                            i not in st.session_state.bomb_indices and
+                            i not in st.session_state.ice_indices and
+                            i not in st.session_state.light_indices):
+                            if card not in unmatched_cards:
+                                unmatched_cards[card] = []
+                            unmatched_cards[card].append(i)
+                    
+                    # 쌍이 있는 카드 자동 매칭
+                    for card, indices in unmatched_cards.items():
+                        if len(indices) >= 2:
+                            st.session_state.matched[indices[0]] = True
+                            st.session_state.matched[indices[1]] = True
+                            st.session_state.matches_found += 1
+                            break
             else:
                 # 매칭 실패 - 실패 횟수 증가
                 st.session_state.failures += 1
@@ -322,13 +382,25 @@ with col3:
 st.markdown("---")
 
 # 게임 정보 표시
+status_messages = []
 if config['bombs'] > 0:
     if st.session_state.bombs_revealed:
-        st.success("❄️ **얼음 카드 효과 발동! 폭탄 위치가 공개되었습니다!**")
+        status_messages.append("❄️ **얼음 카드 효과 발동! 폭탄 위치가 공개되었습니다!**")
     else:
-        st.warning("⚠️ **폭탄 카드는 건드릴시 바로 실패합니다.**")
+        status_messages.append("⚠️ **폭탄 카드는 건드릴시 바로 실패합니다.**")
         if config['has_ice']:
-            st.info("💡 **힌트: 얼음 카드를 맞추면 폭탄 위치를 알 수 있습니다!**")
+            status_messages.append("💡 **힌트: 얼음 카드를 맞추면 폭탄 위치를 알 수 있습니다!**")
+
+if config['has_light']:
+    status_messages.append("💡 **힌트: 빛 카드를 맞추면 다른 카드가 자동으로 맞춰집니다!**")
+
+for msg in status_messages:
+    if "❄️" in msg or "✨" in msg:
+        st.success(msg)
+    elif "💡" in msg:
+        st.info(msg)
+    else:
+        st.warning(msg)
 
 # 게임 실패 체크
 if st.session_state.failures >= config['max_failures']:
@@ -363,6 +435,7 @@ for row in range(grid_rows):
                 # 매칭된 카드는 초록색
                 # 폭탄은 빨간색 (공개되었거나 미리보기 중일 때)
                 # 얼음은 하늘색
+                # 빛은 금색
                 # 나머지는 노란색
                 if st.session_state.matched[index]:
                     bg_color = "#90EE90"
@@ -370,8 +443,10 @@ for row in range(grid_rows):
                     bg_color = "#FF6B6B"
                 elif index in st.session_state.ice_indices:
                     bg_color = "#87CEEB"
-                else:
+                elif index in st.session_state.light_indices:
                     bg_color = "#FFD700"
+                else:
+                    bg_color = "#FFA07A"
                     
                 st.markdown(
                     f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
