@@ -28,7 +28,7 @@ def get_level_config(level):
             'has_ice': True, 'has_light': True, 'has_witch': False, 'has_lock': False, 'has_ball': False, 'has_joker': False},
         5: {'grid_rows': 3, 'grid_cols': 7, 'pairs': 9, 'max_failures': 7, 'bombs': 3,
             'has_ice': True, 'has_light': True, 'has_witch': True, 'has_lock': False, 'has_ball': False, 'has_joker': False},
-        6: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 8, 'bombs': 3,
+        6: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 9, 'bombs': 3,
             'has_ice': False, 'has_light': True, 'has_witch': True, 'has_lock': True, 'has_ball': False, 'has_joker': False},
         7: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 10, 'max_failures': 8, 'bombs': 5,
             'has_ice': False, 'has_light': True, 'has_witch': True, 'has_lock': False, 'has_ball': True, 'has_joker': False},
@@ -215,7 +215,7 @@ def card_clicked(index):
         else:
             st.session_state.second_card = index
             st.session_state.revealed[index] = True
-        st.session_state.show_cards_until = time.time() + 1
+        st.session_state.show_cards_until = time.time() + 0.5
 
 # 제목
 st.title("🎴 카드 메모리 게임")
@@ -306,10 +306,12 @@ if st.session_state.show_cards_until:
         if first_idx in st.session_state.bomb_indices:
             st.session_state.revealed[first_idx] = False
         elif second_idx is not None:
+            match_success = False
             if st.session_state.cards[first_idx] == st.session_state.cards[second_idx]:
                 st.session_state.matched[first_idx] = True
                 st.session_state.matched[second_idx] = True
                 st.session_state.matches_found += 1
+                match_success = True
                 
                 if first_idx in st.session_state.witch_indices:
                     st.session_state.witch_defeated = True
@@ -339,6 +341,10 @@ if st.session_state.show_cards_until:
                 st.session_state.failures += 1
                 st.session_state.revealed[first_idx] = False
                 st.session_state.revealed[second_idx] = False
+            
+            # 매칭 성공 시 대기 시간 절반 (0.5초)
+            if match_success:
+                time.sleep(0.5)
         
         st.session_state.first_card = None
         st.session_state.second_card = None
@@ -360,12 +366,12 @@ with col3:
 st.markdown("---")
 
 # 상태 메시지
-if config['has_witch']:
+if config['has_witch'] and st.session_state.level == 5:
     if st.session_state.witch_defeated:
         st.success("🧙 **마녀를 처치했습니다! 이제 특수 카드 효과가 발동됩니다!**")
     else:
         st.warning("🧙 **마녀 카드를 먼저 처치해야 얼음/빛 카드 효과가 발동됩니다!**")
-if config['has_lock']:
+if config['has_lock'] and st.session_state.level == 6:
     if st.session_state.lock_opened:
         st.success("🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**")
     else:
@@ -433,7 +439,8 @@ for row in range(config['grid_rows']):
                                    f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
                                    f"display: flex; align-items: center; justify-content: center; border: 2px solid #CCC;'>❓</div>",
                                    unsafe_allow_html=True)
-                        if st.button("카드 선택", key=f"card_{idx}", disabled=disabled):
+                        button_label = "카드 선택" if st.session_state.level < 4 else ""
+                        if st.button(button_label, key=f"card_{idx}", disabled=disabled):
                             card_clicked(idx)
                             st.rerun()
 
