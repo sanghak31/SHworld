@@ -3,7 +3,7 @@ import random
 import time
 
 # 페이지 설정
-st.set_page_config(page_title="메모리 카드 게임", page_icon="🎴", layout="centered")
+st.set_page_config(page_title="카드 메모리 게임", page_icon="🎴", layout="centered")
 
 # 이모지 카드 세트
 CARD_EMOJIS = ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐸", "🐵", "🦁", "🐯"]
