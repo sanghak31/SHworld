@@ -606,19 +606,18 @@ for row in range(grid_rows):
                         )
                     else:
                         # 일반 뒤집힌 카드 - 무색 배경에 ? 이모지
+                        if st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=disabled):
+                            card_clicked(index)
+                            st.rerun()
+                        # CSS로 버튼 위에 카드 표시
                         st.markdown(
                             f"<div style='background-color: #F5F5F5; padding: 30px; text-align: center; "
-                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                            f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
                             f"display: flex; align-items: center; justify-content: center; "
-                            f"border: 2px solid #CCCCCC; cursor: {'pointer' if not disabled else 'not-allowed'};'>"
+                            f"border: 2px solid #CCCCCC; pointer-events: none;'>"
                             f"❓</div>",
                             unsafe_allow_html=True
                         )
-                        if not disabled:
-                            # 투명 버튼으로 클릭 감지
-                            if st.button("", key=f"card_{index}", use_container_width=True, type="secondary"):
-                                card_clicked(index)
-                                st.rerun()
 
 # 미리보기나 카드 보여주기 중이면 자동 새로고침
 if is_showing_cards:
@@ -627,6 +626,11 @@ if is_showing_cards:
 
 # 게임 클리어
 if st.session_state.matches_found == config['pairs'] and st.session_state.failures < config['max_failures']:
+    # 모든 짝을 찾았으면 폭탄도 공개
+    if not st.session_state.bombs_revealed and len(st.session_state.bomb_indices) > 0:
+        st.session_state.bombs_revealed = True
+        st.rerun()
+    
     st.balloons()
     st.success(f"🎉 레벨 {st.session_state.level} 클리어! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
     if st.button("➡️ 다음 레벨로", type="primary", use_container_width=True):
