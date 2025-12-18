@@ -162,6 +162,9 @@ if 'witch_defeated' not in st.session_state:
 if 'edge_indices' not in st.session_state:
     st.session_state.edge_indices = []
 
+if 'auto_reveal_bombs' not in st.session_state:
+    st.session_state.auto_reveal_bombs = False
+
 def start_game():
     """게임 시작 및 초기화"""
     config = get_level_config(st.session_state.level)
@@ -263,6 +266,7 @@ def start_game():
     st.session_state.bombs_revealed = False
     st.session_state.lock_opened = False
     st.session_state.witch_defeated = False
+    st.session_state.auto_reveal_bombs = False
 
 def stop_preview():
     """미리보기 종료"""
@@ -290,6 +294,8 @@ def reset_to_level_1():
     st.session_state.bombs_revealed = False
     st.session_state.lock_opened = False
     st.session_state.witch_defeated = False
+    st.session_state.auto_reveal_bombs = False
+    st.session_state.auto_reveal_bombs = False
 
 def next_level():
     """다음 레벨로 진행"""
@@ -443,6 +449,7 @@ if st.session_state.show_cards_until is not None:
                     # 얼음 카드를 매칭한 경우 폭탄 공개
                     if first_idx in st.session_state.ice_indices:
                         st.session_state.bombs_revealed = True
+                        st.session_state.auto_reveal_bombs = False  # 수동 공개
                     
                     # 빛 카드를 매칭한 경우 다른 카드 1쌍 자동 매칭
                     if first_idx in st.session_state.light_indices:
@@ -505,7 +512,7 @@ if config['has_lock']:
     else:
         status_messages.append(("warning", "🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**"))
 
-if config['bombs'] > 0 and st.session_state.bombs_revealed:
+if config['bombs'] > 0 and st.session_state.bombs_revealed and not st.session_state.auto_reveal_bombs:
     status_messages.append(("success", "❄️ **얼음 카드 효과 발동! 폭탄 위치가 공개되었습니다!**"))
 
 for msg_type, msg in status_messages:
@@ -567,29 +574,29 @@ for row in range(grid_rows):
                     bg_color = "#D3D3D3"
                 else:
                     bg_color = "#FFD700"
-                
-                # 버튼 먼저 생성 (비활성화)
-                st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
-                # 카드를 버튼 위에 표시
+                    
                 st.markdown(
                     f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
-                    f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
-                    f"display: flex; align-items: center; justify-content: center; pointer-events: none;'>"
+                    f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                    f"display: flex; align-items: center; justify-content: center;'>"
                     f"{st.session_state.cards[index]}</div>",
                     unsafe_allow_html=True
                 )
+                # 매칭된 카드 아래에 비활성화된 버튼 추가 (클릭해도 아무 일 없음)
+                if st.session_state.matched[index]:
+                    st.button("", key=f"card_{index}", use_container_width=True, disabled=True)
             else:
                 # 폭탄이 공개된 경우 폭탄 위치에 경고 표시
                 if st.session_state.bombs_revealed and index in st.session_state.bomb_indices:
-                    # 버튼 먼저 생성 (비활성화)
-                    st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
                     st.markdown(
                         f"<div style='background-color: #FF6B6B; padding: 30px; text-align: center; "
-                        f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
-                        f"display: flex; align-items: center; justify-content: center; opacity: 0.7; pointer-events: none;'>"
+                        f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                        f"display: flex; align-items: center; justify-content: center; opacity: 0.7;'>"
                         f"💣</div>",
                         unsafe_allow_html=True
                     )
+                    # 폭탄 아래에 비활성화된 버튼 추가
+                    st.button("", key=f"card_{index}", use_container_width=True, disabled=True)
                 else:
                     # 뒤집힌 카드
                     # 자물쇠 카드가 있고, 열리지 않았고, 가장자리이며, 자물쇠 카드가 아닌 경우 비활성화
@@ -602,28 +609,27 @@ for row in range(grid_rows):
                     
                     # 잠긴 가장자리 카드는 회색으로 표시
                     if is_locked_edge:
-                        st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
                         st.markdown(
                             f"<div style='background-color: #E0E0E0; padding: 30px; text-align: center; "
-                            f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
-                            f"display: flex; align-items: center; justify-content: center; opacity: 0.5; pointer-events: none;'>"
+                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                            f"display: flex; align-items: center; justify-content: center; opacity: 0.5;'>"
                             f"❓</div>",
                             unsafe_allow_html=True
                         )
+                        st.button("", key=f"card_{index}", use_container_width=True, disabled=True)
                     else:
                         # 일반 뒤집힌 카드 - 무색 배경에 ? 이모지
-                        if st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=disabled):
-                            card_clicked(index)
-                            st.rerun()
-                        # CSS로 버튼 위에 카드 표시
                         st.markdown(
                             f"<div style='background-color: #F5F5F5; padding: 30px; text-align: center; "
-                            f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
+                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
                             f"display: flex; align-items: center; justify-content: center; "
-                            f"border: 2px solid #CCCCCC; pointer-events: none;'>"
+                            f"border: 2px solid #CCCCCC;'>"
                             f"❓</div>",
                             unsafe_allow_html=True
                         )
+                        if st.button("카드 선택", key=f"card_{index}", use_container_width=True, disabled=disabled):
+                            card_clicked(index)
+                            st.rerun()
 
 # 미리보기나 카드 보여주기 중이면 자동 새로고침
 if is_showing_cards:
