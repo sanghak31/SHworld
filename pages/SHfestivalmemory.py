@@ -567,21 +567,26 @@ for row in range(grid_rows):
                     bg_color = "#D3D3D3"
                 else:
                     bg_color = "#FFD700"
-                    
+                
+                # 버튼 먼저 생성 (비활성화)
+                st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
+                # 카드를 버튼 위에 표시
                 st.markdown(
                     f"<div style='background-color: {bg_color}; padding: 30px; text-align: center; "
-                    f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
-                    f"display: flex; align-items: center; justify-content: center;'>"
+                    f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
+                    f"display: flex; align-items: center; justify-content: center; pointer-events: none;'>"
                     f"{st.session_state.cards[index]}</div>",
                     unsafe_allow_html=True
                 )
             else:
                 # 폭탄이 공개된 경우 폭탄 위치에 경고 표시
                 if st.session_state.bombs_revealed and index in st.session_state.bomb_indices:
+                    # 버튼 먼저 생성 (비활성화)
+                    st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
                     st.markdown(
                         f"<div style='background-color: #FF6B6B; padding: 30px; text-align: center; "
-                        f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
-                        f"display: flex; align-items: center; justify-content: center; opacity: 0.7;'>"
+                        f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
+                        f"display: flex; align-items: center; justify-content: center; opacity: 0.7; pointer-events: none;'>"
                         f"💣</div>",
                         unsafe_allow_html=True
                     )
@@ -597,10 +602,11 @@ for row in range(grid_rows):
                     
                     # 잠긴 가장자리 카드는 회색으로 표시
                     if is_locked_edge:
+                        st.button("", key=f"card_{index}", use_container_width=True, type="secondary", disabled=True)
                         st.markdown(
                             f"<div style='background-color: #E0E0E0; padding: 30px; text-align: center; "
-                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
-                            f"display: flex; align-items: center; justify-content: center; opacity: 0.5;'>"
+                            f"border-radius: 10px; font-size: 40px; margin-top: -58px; height: 80px; "
+                            f"display: flex; align-items: center; justify-content: center; opacity: 0.5; pointer-events: none;'>"
                             f"❓</div>",
                             unsafe_allow_html=True
                         )
