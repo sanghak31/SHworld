@@ -2,7 +2,6 @@ import streamlit as st
 import random
 import time
 
-
 # 페이지 설정
 st.set_page_config(page_title="메모리 카드 게임", page_icon="🎴", layout="centered")
 
@@ -327,10 +326,12 @@ def card_clicked(index):
     if st.session_state.bombs_revealed and index in st.session_state.bomb_indices:
         return
     
-    # 자물쇠가 열리지 않았고 가장자리 카드면 클릭 무시 (단, 자물쇠 카드는 예외)
-    if not st.session_state.lock_opened and index in st.session_state.edge_indices:
-        if index not in st.session_state.lock_indices:
-            return
+    # 자물쇠 카드가 있고, 열리지 않았고, 가장자리 카드면 클릭 무시 (단, 자물쇠 카드는 예외)
+    if (len(st.session_state.lock_indices) > 0 and 
+        not st.session_state.lock_opened and 
+        index in st.session_state.edge_indices and
+        index not in st.session_state.lock_indices):
+        return
     
     # 첫 번째 카드 선택
     if st.session_state.first_card is None:
@@ -585,18 +586,39 @@ for row in range(grid_rows):
                         unsafe_allow_html=True
                     )
                 else:
-                    # 뒤집힌 카드 (클릭 가능)
-                    # 자물쇠가 열리지 않았고 가장자리이며 자물쇠 카드가 아닌 경우 비활성화
-                    is_locked_edge = (not st.session_state.lock_opened and 
+                    # 뒤집힌 카드
+                    # 자물쇠 카드가 있고, 열리지 않았고, 가장자리이며, 자물쇠 카드가 아닌 경우 비활성화
+                    is_locked_edge = (len(st.session_state.lock_indices) > 0 and
+                                     not st.session_state.lock_opened and 
                                      index in st.session_state.edge_indices and 
-                                     index not in st.session_state.lock_indices and
-                                     len(st.session_state.lock_indices) > 0)
+                                     index not in st.session_state.lock_indices)
                     
                     disabled = is_preview or is_showing_cards or st.session_state.second_card is not None or is_locked_edge
                     
-                    if st.button("❓", key=f"card_{index}", use_container_width=True, disabled=disabled):
-                        card_clicked(index)
-                        st.rerun()
+                    # 잠긴 가장자리 카드는 회색으로 표시
+                    if is_locked_edge:
+                        st.markdown(
+                            f"<div style='background-color: #E0E0E0; padding: 30px; text-align: center; "
+                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                            f"display: flex; align-items: center; justify-content: center; opacity: 0.5;'>"
+                            f"❓</div>",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        # 일반 뒤집힌 카드 - 무색 배경에 ? 이모지
+                        st.markdown(
+                            f"<div style='background-color: #F5F5F5; padding: 30px; text-align: center; "
+                            f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
+                            f"display: flex; align-items: center; justify-content: center; "
+                            f"border: 2px solid #CCCCCC; cursor: {'pointer' if not disabled else 'not-allowed'};'>"
+                            f"❓</div>",
+                            unsafe_allow_html=True
+                        )
+                        if not disabled:
+                            # 투명 버튼으로 클릭 감지
+                            if st.button("", key=f"card_{index}", use_container_width=True, type="secondary"):
+                                card_clicked(index)
+                                st.rerun()
 
 # 미리보기나 카드 보여주기 중이면 자동 새로고침
 if is_showing_cards:
