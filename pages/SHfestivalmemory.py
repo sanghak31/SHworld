@@ -457,4 +457,3 @@ if st.session_state.matches_found == config['pairs'] and st.session_state.failur
     
     st.balloons()
     st.success(f"🎉 레벨 {st.session_state.level} 클리어! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
-    if
