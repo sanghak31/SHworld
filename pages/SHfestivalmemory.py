@@ -132,35 +132,35 @@ def start_game():
         if config['has_ball'] and not all(i in edge_indices for i in ball_indices):
             continue
         
-# 광대: 적어도 하나가 가장자리에 있으면, 모든 광대가 자물쇠와 1칸 이내에 없어야 함
-joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
-if config['has_joker'] and config['has_lock']:
-    joker_valid = True
-    # 광대 카드 중 적어도 하나가 가장자리에 있는지 확인
-    has_edge_joker = any(j_idx in edge_indices for j_idx in joker_indices)
-    
-    if has_edge_joker:
-        # 가장자리에 광대가 있으면, 모든 광대가 자물쇠와 1칸 이내에 없어야 함
-        for j_idx in joker_indices:
-            for l_idx in lock_indices:
-                if is_adjacent(j_idx, l_idx, cols):
-                    joker_valid = False
-                    break
-            if not joker_valid:
-                break
-    else:
-        # 가장자리에 광대가 없으면 기존 조건 적용 (가장자리 광대만 체크)
-        for j_idx in joker_indices:
-            if j_idx in edge_indices:
-                for l_idx in lock_indices:
-                    if is_adjacent(j_idx, l_idx, cols):
-                        joker_valid = False
+        # 광대: 적어도 하나가 가장자리에 있으면, 모든 광대가 자물쇠와 1칸 이내에 없어야 함
+        joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
+        if config['has_joker'] and config['has_lock']:
+            joker_valid = True
+            # 광대 카드 중 적어도 하나가 가장자리에 있는지 확인
+            has_edge_joker = any(j_idx in edge_indices for j_idx in joker_indices)
+            
+            if has_edge_joker:
+                # 가장자리에 광대가 있으면, 모든 광대가 자물쇠와 1칸 이내에 없어야 함
+                for j_idx in joker_indices:
+                    for l_idx in lock_indices:
+                        if is_adjacent(j_idx, l_idx, cols):
+                            joker_valid = False
+                            break
+                    if not joker_valid:
                         break
+            else:
+                # 가장자리에 광대가 없으면 기존 조건 적용 (가장자리 광대만 체크)
+                for j_idx in joker_indices:
+                    if j_idx in edge_indices:
+                        for l_idx in lock_indices:
+                            if is_adjacent(j_idx, l_idx, cols):
+                                joker_valid = False
+                                break
+                    if not joker_valid:
+                        break
+            
             if not joker_valid:
-                break
-    
-    if not joker_valid:
-        continue  # 이 continue는 max_attempts 루프를 다시 시도하도록 함
+                continue
         
         # 레벨 9: 얼음 카드 최소 1개는 가장자리에
         ice_indices = [i for i, c in enumerate(card_list) if c == ICE_EMOJI]
