@@ -117,7 +117,7 @@ def start_game():
     
     # 카드 섞기 (특수 배치 조건 확인)
     edge_indices = get_edge_indices(rows, cols)
-    max_attempts = 200
+    max_attempts = 500
     
     for _ in range(max_attempts):
         random.shuffle(card_list)
@@ -126,22 +126,33 @@ def start_game():
         lock_indices = [i for i, c in enumerate(card_list) if c == LOCK_EMOJI]
         if config['has_lock'] and any(i in edge_indices for i in lock_indices):
             continue
-            
-        # 광대는 가장자리에 없어야 함
-        joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
-        if config['has_joker'] and any(i in edge_indices for i in joker_indices):
-            continue
-            
+        
         # 무도회는 가장자리에만 있어야 함
         ball_indices = [i for i, c in enumerate(card_list) if c == BALL_EMOJI]
         if config['has_ball'] and not all(i in edge_indices for i in ball_indices):
             continue
-            
+        
+        # 광대: 가장자리에 있을 경우 자물쇠와 1칸 이내로 가까이 있으면 안됨
+        joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
+        if config['has_joker'] and config['has_lock']:
+            joker_valid = True
+            for j_idx in joker_indices:
+                if j_idx in edge_indices:
+                    # 광대가 가장자리에 있을 때만 체크
+                    for l_idx in lock_indices:
+                        if is_adjacent(j_idx, l_idx, cols):
+                            joker_valid = False
+                            break
+                if not joker_valid:
+                    break
+            if not joker_valid:
+                continue
+        
         # 레벨 9: 얼음 카드 최소 1개는 가장자리에
         ice_indices = [i for i, c in enumerate(card_list) if c == ICE_EMOJI]
         if st.session_state.level == 9 and not any(i in edge_indices for i in ice_indices):
             continue
-            
+        
         break
     
     # 상태 초기화
@@ -207,24 +218,34 @@ def card_clicked(index):
     
     # 첫 번째 카드
     if st.session_state.first_card is None:
-        st.session_state.first_card = index
-        st.session_state.revealed[index] = True
+        # 폭탄 체크 (광대보다 우선)
         if index in st.session_state.bomb_indices:
+            st.session_state.first_card = index
+            st.session_state.revealed[index] = True
             st.session_state.failures += 1
             st.session_state.show_cards_until = time.time() + 1
+            return
+        
+        # 광대 트리거 확인 (첫 번째 선택이 광대 주변일 때)
+        adjacent_jokers = [j for j in st.session_state.joker_indices 
+                          if not st.session_state.matched[j] and is_adjacent(index, j, config['grid_cols'])]
+        
+        if adjacent_jokers:
+            # 광대 주변 카드를 첫 번째로 선택하면 광대가 자동으로 두 번째 선택됨
+            st.session_state.first_card = index
+            st.session_state.revealed[index] = True
+            st.session_state.second_card = adjacent_jokers[0]  # 첫 번째 광대만 선택
+            st.session_state.revealed[adjacent_jokers[0]] = True
+            st.session_state.joker_triggered = True
+            st.session_state.show_cards_until = time.time() + 1
+        else:
+            # 일반 첫 번째 선택
+            st.session_state.first_card = index
+            st.session_state.revealed[index] = True
     # 두 번째 카드
     elif st.session_state.second_card is None:
-        # 광대 트리거 확인
-        if any(is_adjacent(index, j, config['grid_cols']) for j in st.session_state.joker_indices if not st.session_state.matched[j]):
-            st.session_state.joker_triggered = True
-            for j in st.session_state.joker_indices:
-                if not st.session_state.matched[j] and is_adjacent(index, j, config['grid_cols']):
-                    st.session_state.second_card = j
-                    st.session_state.revealed[j] = True
-                    break
-        else:
-            st.session_state.second_card = index
-            st.session_state.revealed[index] = True
+        st.session_state.second_card = index
+        st.session_state.revealed[index] = True
         st.session_state.show_cards_until = time.time() + 1
 
 # 제목
