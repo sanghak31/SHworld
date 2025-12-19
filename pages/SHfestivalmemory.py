@@ -20,13 +20,13 @@ def get_level_config(level):
     configs = {
         1: {'grid_rows': 2, 'grid_cols': 2, 'pairs': 2, 'max_failures': 8, 'bombs': 0,
             'has_ice': False, 'has_light': False, 'has_witch': False, 'has_lock': False, 'has_ball': False, 'has_joker': False},
-        2: {'grid_rows': 3, 'grid_cols': 3, 'pairs': 4, 'max_failures': 10, 'bombs': 1,
+        2: {'grid_rows': 3, 'grid_cols': 3, 'pairs': 4, 'max_failures': 8, 'bombs': 1,
             'has_ice': False, 'has_light': False, 'has_witch': False, 'has_lock': False, 'has_ball': False, 'has_joker': False},
         3: {'grid_rows': 4, 'grid_cols': 4, 'pairs': 7, 'max_failures': 10, 'bombs': 2,
             'has_ice': True, 'has_light': False, 'has_witch': False, 'has_lock': False, 'has_ball': False, 'has_joker': False},
         4: {'grid_rows': 4, 'grid_cols': 5, 'pairs': 8, 'max_failures': 10, 'bombs': 4,
             'has_ice': True, 'has_light': True, 'has_witch': False, 'has_lock': False, 'has_ball': False, 'has_joker': False},
-        5: {'grid_rows': 3, 'grid_cols': 7, 'pairs': 9, 'max_failures': 10, 'bombs': 3,
+        5: {'grid_rows': 3, 'grid_cols': 7, 'pairs': 9, 'max_failures': 12, 'bombs': 3,
             'has_ice': True, 'has_light': True, 'has_witch': True, 'has_lock': False, 'has_ball': False, 'has_joker': False},
         6: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 12, 'bombs': 3,
             'has_ice': False, 'has_light': True, 'has_witch': True, 'has_lock': True, 'has_ball': False, 'has_joker': False},
@@ -348,6 +348,50 @@ if st.session_state.show_cards_until:
                     st.session_state.revealed[current_pos], st.session_state.revealed[new_pos] = st.session_state.revealed[new_pos], st.session_state.revealed[current_pos]
                     # matched 상태 교환
                     st.session_state.matched[current_pos], st.session_state.matched[new_pos] = st.session_state.matched[new_pos], st.session_state.matched[current_pos]
+                    
+                    # 특수 카드 인덱스 업데이트
+                    if current_pos in st.session_state.bomb_indices:
+                        st.session_state.bomb_indices.remove(current_pos)
+                        st.session_state.bomb_indices.append(new_pos)
+                    elif new_pos in st.session_state.bomb_indices:
+                        st.session_state.bomb_indices.remove(new_pos)
+                        st.session_state.bomb_indices.append(current_pos)
+                    
+                    if current_pos in st.session_state.ice_indices:
+                        st.session_state.ice_indices.remove(current_pos)
+                        st.session_state.ice_indices.append(new_pos)
+                    elif new_pos in st.session_state.ice_indices:
+                        st.session_state.ice_indices.remove(new_pos)
+                        st.session_state.ice_indices.append(current_pos)
+                    
+                    if current_pos in st.session_state.light_indices:
+                        st.session_state.light_indices.remove(current_pos)
+                        st.session_state.light_indices.append(new_pos)
+                    elif new_pos in st.session_state.light_indices:
+                        st.session_state.light_indices.remove(new_pos)
+                        st.session_state.light_indices.append(current_pos)
+                    
+                    if current_pos in st.session_state.witch_indices:
+                        st.session_state.witch_indices.remove(current_pos)
+                        st.session_state.witch_indices.append(new_pos)
+                    elif new_pos in st.session_state.witch_indices:
+                        st.session_state.witch_indices.remove(new_pos)
+                        st.session_state.witch_indices.append(current_pos)
+                    
+                    if current_pos in st.session_state.lock_indices:
+                        st.session_state.lock_indices.remove(current_pos)
+                        st.session_state.lock_indices.append(new_pos)
+                    elif new_pos in st.session_state.lock_indices:
+                        st.session_state.lock_indices.remove(new_pos)
+                        st.session_state.lock_indices.append(current_pos)
+                    
+                    if current_pos in st.session_state.joker_indices:
+                        st.session_state.joker_indices.remove(current_pos)
+                        st.session_state.joker_indices.append(new_pos)
+                    elif new_pos in st.session_state.joker_indices:
+                        st.session_state.joker_indices.remove(new_pos)
+                        st.session_state.joker_indices.append(current_pos)
+                    
                     # 위치 업데이트
                     st.session_state.ball_positions[original_ball_idx] = new_pos
         
