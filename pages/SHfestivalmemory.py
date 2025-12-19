@@ -439,8 +439,9 @@ for row in range(config['grid_rows']):
                                    f"border-radius: 10px; font-size: 40px; margin: 5px; height: 80px; "
                                    f"display: flex; align-items: center; justify-content: center; border: 2px solid #CCC;'>❓</div>",
                                    unsafe_allow_html=True)
-                        button_label = "카드 선택" if st.session_state.level < 4 else ""
-                        if st.button(button_label, key=f"card_{idx}", disabled=disabled):
+                        # 레벨 3 이하는 "카드 선택", 레벨 4 이상은 빈 텍스트
+                        button_text = "카드 선택" if st.session_state.level <= 3 else ""
+                        if st.button(button_text, key=f"card_{idx}", use_container_width=True, disabled=disabled):
                             card_clicked(idx)
                             st.rerun()
 
@@ -457,3 +458,4 @@ if st.session_state.matches_found == config['pairs'] and st.session_state.failur
     
     st.balloons()
     st.success(f"🎉 레벨 {st.session_state.level} 클리어! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
+    if
