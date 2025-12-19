@@ -31,7 +31,7 @@ def get_level_config(level):
         6: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 12, 'bombs': 3,
             'has_ice': False, 'has_light': True, 'has_witch': True, 'has_lock': True, 'has_ball': False, 'has_joker': False},
         7: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 10, 'max_failures': 12, 'bombs': 5,
-            'has_ice': False, 'has_light': True, 'has_witch': True, 'has_lock': False, 'has_ball': True, 'has_joker': False},
+            'has_ice': True, 'has_light': True, 'has_witch': True, 'has_lock': False, 'has_ball': True, 'has_joker': False},
         8: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 12, 'bombs': 3,
             'has_ice': False, 'has_light': False, 'has_witch': False, 'has_lock': True, 'has_ball': True, 'has_joker': True},
         9: {'grid_rows': 6, 'grid_cols': 6, 'pairs': 7, 'max_failures': 8, 'bombs': 22,
