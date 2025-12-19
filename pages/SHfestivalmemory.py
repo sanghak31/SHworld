@@ -458,4 +458,12 @@ if st.session_state.matches_found == config['pairs'] and st.session_state.failur
     
     st.balloons()
     st.success(f"🎉 레벨 {st.session_state.level} 클리어! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
-    if
+    if st.session_state.level < 10:
+        if st.button("➡️ 다음 레벨로", type="primary", use_container_width=True):
+            next_level()
+            st.rerun()
+    else:
+        st.markdown("### 🏆 모든 레벨을 완료했습니다! 🏆")
+        if st.button("🔄 처음부터 다시 시작", use_container_width=True):
+            reset_to_level_1()
+            st.rerun()
