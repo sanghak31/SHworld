@@ -133,20 +133,34 @@ def start_game():
             continue
         
         # 광대: 가장자리에 있을 경우 자물쇠와 1칸 이내로 가까이 있으면 안됨
-        joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
-        if config['has_joker'] and config['has_lock']:
-            joker_valid = True
-            for j_idx in joker_indices:
-                if j_idx in edge_indices:
-                    # 광대가 가장자리에 있을 때만 체크
-                    for l_idx in lock_indices:
-                        if is_adjacent(j_idx, l_idx, cols):
-                            joker_valid = False
-                            break
-                if not joker_valid:
+joker_indices = [i for i, c in enumerate(card_list) if c == JOKER_EMOJI]
+if config['has_joker'] and config['has_lock']:
+    joker_valid = True
+    # 광대 카드 중 적어도 하나가 가장자리에 있는지 확인
+    has_edge_joker = any(j_idx in edge_indices for j_idx in joker_indices)
+    
+    if has_edge_joker:
+        # 가장자리에 광대가 있으면, 모든 광대가 자물쇠와 1칸 이내에 없어야 함
+        for j_idx in joker_indices:
+            for l_idx in lock_indices:
+                if is_adjacent(j_idx, l_idx, cols):
+                    joker_valid = False
                     break
             if not joker_valid:
-                continue
+                break
+    else:
+        # 가장자리에 광대가 없으면 기존 조건 적용 (가장자리 광대만 체크)
+        for j_idx in joker_indices:
+            if j_idx in edge_indices:
+                for l_idx in lock_indices:
+                    if is_adjacent(j_idx, l_idx, cols):
+                        joker_valid = False
+                        break
+            if not joker_valid:
+                break
+    
+    if not joker_valid:
+        continue
         
         # 레벨 9: 얼음 카드 최소 1개는 가장자리에
         ice_indices = [i for i, c in enumerate(card_list) if c == ICE_EMOJI]
