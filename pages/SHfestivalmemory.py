@@ -59,12 +59,22 @@ for key in ['level', 'game_started', 'cards', 'revealed', 'matched', 'first_card
             st.session_state[key] = []
 
 def get_edge_indices(rows, cols):
-    """가장자리 인덱스 반환"""
+    """가장자리 인덱스 반환 (시계방향 순서)"""
     edges = []
-    for i in range(rows * cols):
-        row, col = i // cols, i % cols
-        if row == 0 or row == rows - 1 or col == 0 or col == cols - 1:
-            edges.append(i)
+    # 상단 (왼쪽에서 오른쪽)
+    for c in range(cols):
+        edges.append(c)
+    # 오른쪽 (위에서 아래, 모서리 제외)
+    for r in range(1, rows):
+        edges.append(r * cols + (cols - 1))
+    # 하단 (오른쪽에서 왼쪽, 모서리 제외)
+    if rows > 1:
+        for c in range(cols - 2, -1, -1):
+            edges.append((rows - 1) * cols + c)
+    # 왼쪽 (아래에서 위, 모서리 제외)
+    if cols > 1:
+        for r in range(rows - 2, 0, -1):
+            edges.append(r * cols)
     return edges
 
 def move_ball_clockwise(ball_idx, rows, cols):
@@ -286,23 +296,6 @@ if st.session_state.show_cards_until:
         first_idx = st.session_state.first_card
         second_idx = st.session_state.second_card
         
-        # 무도회 카드 이동
-        if config['has_ball']:
-            new_positions = {}
-            for ball_idx in st.session_state.ball_indices:
-                old_pos = st.session_state.ball_positions[ball_idx]
-                new_pos = move_ball_clockwise(old_pos, config['grid_rows'], config['grid_cols'])
-                new_positions[ball_idx] = new_pos
-                # 카드 위치 교환
-                old_card = st.session_state.cards[old_pos]
-                new_card = st.session_state.cards[new_pos]
-                st.session_state.cards[old_pos] = new_card
-                st.session_state.cards[new_pos] = old_card
-                # 상태도 교환
-                for state_list in [st.session_state.revealed, st.session_state.matched]:
-                    state_list[old_pos], state_list[new_pos] = state_list[new_pos], state_list[old_pos]
-            st.session_state.ball_positions = new_positions
-        
         if first_idx in st.session_state.bomb_indices:
             st.session_state.revealed[first_idx] = False
         elif second_idx is not None:
@@ -345,6 +338,22 @@ if st.session_state.show_cards_until:
             # 매칭 성공 시 대기 시간 절반 (0.5초)
             if match_success:
                 time.sleep(0.5)
+        
+        # 무도회 카드 이동 (매칭 결과와 무관하게)
+        if config['has_ball']:
+            for original_ball_idx in list(st.session_state.ball_indices):
+                current_pos = st.session_state.ball_positions[original_ball_idx]
+                new_pos = move_ball_clockwise(current_pos, config['grid_rows'], config['grid_cols'])
+                
+                if current_pos != new_pos:
+                    # 두 위치의 카드 교환
+                    st.session_state.cards[current_pos], st.session_state.cards[new_pos] = st.session_state.cards[new_pos], st.session_state.cards[current_pos]
+                    # revealed 상태 교환
+                    st.session_state.revealed[current_pos], st.session_state.revealed[new_pos] = st.session_state.revealed[new_pos], st.session_state.revealed[current_pos]
+                    # matched 상태 교환
+                    st.session_state.matched[current_pos], st.session_state.matched[new_pos] = st.session_state.matched[new_pos], st.session_state.matched[current_pos]
+                    # 위치 업데이트
+                    st.session_state.ball_positions[original_ball_idx] = new_pos
         
         st.session_state.first_card = None
         st.session_state.second_card = None
@@ -458,6 +467,7 @@ if st.session_state.matches_found == config['pairs'] and st.session_state.failur
     
     st.balloons()
     st.success(f"🎉 레벨 {st.session_state.level} 클리어! 실패 {st.session_state.failures}번으로 모든 짝을 찾았습니다!")
+    
     if st.session_state.level < 10:
         if st.button("➡️ 다음 레벨로", type="primary", use_container_width=True):
             next_level()
