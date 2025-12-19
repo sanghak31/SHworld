@@ -225,7 +225,7 @@ def card_clicked(index):
         else:
             st.session_state.second_card = index
             st.session_state.revealed[index] = True
-        st.session_state.show_cards_until = time.time() + 0.5
+        st.session_state.show_cards_until = time.time() + 1
 
 # 제목
 st.title("🎴 카드 메모리 게임")
@@ -334,10 +334,6 @@ if st.session_state.show_cards_until:
                 st.session_state.failures += 1
                 st.session_state.revealed[first_idx] = False
                 st.session_state.revealed[second_idx] = False
-            
-            # 매칭 성공 시 대기 시간 절반 (0.5초)
-            if match_success:
-                time.sleep(0.5)
         
         # 무도회 카드 이동 (매칭 결과와 무관하게)
         if config['has_ball']:
@@ -413,7 +409,7 @@ for row in range(config['grid_rows']):
             if should_show:
                 color_map = {
                     BOMB_EMOJI: "#FF6B6B", ICE_EMOJI: "#87CEEB", LIGHT_EMOJI: "#FFFFE0",
-                    WITCH_EMOJI: "#9370DB", LOCK_EMOJI: "#D3D3D3", BALL_EMOJI: "#FF6B6B", JOKER_EMOJI: "#90EE90"
+                    WITCH_EMOJI: "#9370DB", LOCK_EMOJI: "#D3D3D3", BALL_EMOJI: "#FFB6C6", JOKER_EMOJI: "#90EE90"
                 }
                 bg = "#90EE90" if st.session_state.matched[idx] else color_map.get(st.session_state.cards[idx], "#FFD700")
                 if idx in st.session_state.bomb_indices and (is_preview or st.session_state.bombs_revealed):
@@ -435,6 +431,7 @@ for row in range(config['grid_rows']):
                 else:
                     is_locked = (len(st.session_state.lock_indices) > 0 and not st.session_state.lock_opened and
                                 idx in st.session_state.edge_indices and idx not in st.session_state.lock_indices)
+                    # 카드 처리 중에는 클릭 비활성화
                     disabled = is_preview or is_showing_cards or st.session_state.second_card is not None or is_locked
                     
                     if is_locked:
@@ -459,7 +456,7 @@ if is_preview or is_showing_cards:
     st.rerun()
 
 # 게임 클리어
-if st.session_state.matches_found == config['pairs'] and st.session_state.failures < config['max_failures']:
+if st.session_state.matches_found >= config['pairs'] and st.session_state.failures < config['max_failures']:
     if not st.session_state.bombs_revealed and len(st.session_state.bomb_indices) > 0:
         st.session_state.bombs_revealed = True
         st.session_state.auto_reveal_bombs = True
