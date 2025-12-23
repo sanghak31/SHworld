@@ -237,7 +237,7 @@ if not st.session_state.game_started:
 is_preview = st.session_state.is_previewing
 if is_preview:
     elapsed = time.time() - st.session_state.preview_start_time
-    remaining = max(0, 10 - int(elapsed))
+    remaining = max(0, 5 - int(elapsed))
     
     if remaining > 0:
         st.warning(f"⏱️ 카드 위치를 기억하세요! {remaining}초 남음...")
