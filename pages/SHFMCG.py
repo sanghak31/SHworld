@@ -250,7 +250,7 @@ if is_preview:
     
     if remaining > 0:
         st.warning(f"⏱️ 카드 위치를 기억하세요! {remaining}초 남음...")
-        if st.button("✅ 맞을 준비가 되었습니다!", use_container_width=True, type="primary"):
+        if st.button("✅ 맞출 준비가 되었습니다!", use_container_width=True, type="primary"):
             stop_preview()
             st.rerun()
     else:
