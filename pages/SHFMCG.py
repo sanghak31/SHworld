@@ -32,13 +32,14 @@ def get_level_config(level):
 for key in ['level', 'game_started', 'cards', 'revealed', 'matched', 'first_card', 'second_card', 
             'failures', 'matches_found', 'is_previewing', 'show_cards_until', 'bomb_indices',
             'light_indices', 'lock_indices', 'ball_indices', 'edge_indices',
-            'bombs_revealed', 'lock_opened', 'auto_reveal_bombs', 'ball_positions']:
+            'bombs_revealed', 'lock_opened', 'auto_reveal_bombs', 'ball_positions', 'preview_start_time',
+            'bomb_hit']:
     if key not in st.session_state:
         if key == 'level':
             st.session_state[key] = 1
-        elif key in ['game_started', 'is_previewing', 'bombs_revealed', 'lock_opened', 'auto_reveal_bombs']:
+        elif key in ['game_started', 'is_previewing', 'bombs_revealed', 'lock_opened', 'auto_reveal_bombs', 'bomb_hit']:
             st.session_state[key] = False
-        elif key in ['first_card', 'second_card', 'show_cards_until']:
+        elif key in ['first_card', 'second_card', 'show_cards_until', 'preview_start_time']:
             st.session_state[key] = None
         elif key in ['failures', 'matches_found']:
             st.session_state[key] = 0
@@ -134,10 +135,12 @@ def start_game():
     st.session_state.bombs_revealed = False
     st.session_state.lock_opened = False
     st.session_state.auto_reveal_bombs = False
+    st.session_state.preview_start_time = time.time()
+    st.session_state.bomb_hit = False
 
 def reset_to_level_1():
     """레벨 1로 리셋"""
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.session_state.level = 1
 
@@ -149,12 +152,7 @@ def next_level():
 def stop_preview():
     """미리보기 종료"""
     st.session_state.is_previewing = False
-
-def is_adjacent(idx1, idx2, cols):
-    """두 인덱스가 인접한지 확인"""
-    r1, c1 = idx1 // cols, idx1 % cols
-    r2, c2 = idx2 // cols, idx2 % cols
-    return abs(r1 - r2) <= 1 and abs(c1 - c2) <= 1 and idx1 != idx2
+    st.session_state.preview_start_time = None
 
 def card_clicked(index):
     """카드 클릭 처리"""
@@ -177,6 +175,7 @@ def card_clicked(index):
             st.session_state.first_card = index
             st.session_state.revealed[index] = True
             st.session_state.failures = config['max_failures']  # 즉시 게임 오버
+            st.session_state.bomb_hit = True  # 폭탄 터짐 플래그
             st.session_state.show_cards_until = time.time() + 1
             return
         
@@ -228,7 +227,7 @@ if not st.session_state.game_started:
             st.info("💃 **무도회 카드는 매 시도마다 시계방향으로 이동합니다!**")
     
     st.markdown("---")
-    st.info("🎮 게임을 시작하면 모든 카드를 볼 수 있습니다!")
+    st.info("🎮 게임을 시작하면 10초 동안 모든 카드를 볼 수 있습니다!")
     if st.button("🚀 게임 시작", use_container_width=True, type="primary"):
         start_game()
         st.rerun()
@@ -237,8 +236,16 @@ if not st.session_state.game_started:
 # 미리보기
 is_preview = st.session_state.is_previewing
 if is_preview:
-    st.warning("⏱️ 카드 위치를 기억하세요!")
-    if st.button("✅ 맞출 준비가 되었습니다!", use_container_width=True, type="primary"):
+    elapsed = time.time() - st.session_state.preview_start_time
+    remaining = max(0, 10 - int(elapsed))
+    
+    if remaining > 0:
+        st.warning(f"⏱️ 카드 위치를 기억하세요! {remaining}초 남음...")
+        if st.button("✅ 맞을 준비가 되었습니다!", use_container_width=True, type="primary"):
+            stop_preview()
+            st.rerun()
+    else:
+        # 10초 경과 시 자동으로 시작
         stop_preview()
         st.rerun()
 
@@ -293,9 +300,7 @@ if st.session_state.show_cards_until:
                 if current_pos != new_pos:
                     # 두 위치의 카드 교환
                     st.session_state.cards[current_pos], st.session_state.cards[new_pos] = st.session_state.cards[new_pos], st.session_state.cards[current_pos]
-                    # revealed 상태 교환
                     st.session_state.revealed[current_pos], st.session_state.revealed[new_pos] = st.session_state.revealed[new_pos], st.session_state.revealed[current_pos]
-                    # matched 상태 교환
                     st.session_state.matched[current_pos], st.session_state.matched[new_pos] = st.session_state.matched[new_pos], st.session_state.matched[current_pos]
                     
                     # 특수 카드 인덱스 업데이트
@@ -320,7 +325,6 @@ if st.session_state.show_cards_until:
                         st.session_state.lock_indices.remove(new_pos)
                         st.session_state.lock_indices.append(current_pos)
                     
-                    # 위치 업데이트
                     st.session_state.ball_positions[original_ball_idx] = new_pos
         
         st.session_state.first_card = None
@@ -350,7 +354,10 @@ if config['has_lock'] and st.session_state.level == 3:
 
 # 게임 오버
 if st.session_state.failures >= config['max_failures']:
-    st.error(f"💀 게임 오버! 실패 횟수가 {config['max_failures']}번을 초과했습니다!")
+    if st.session_state.bomb_hit:
+        st.error("💀 게임 오버! 폭탄을 건드렸습니다!")
+    else:
+        st.error(f"💀 게임 오버! 실패 횟수가 {config['max_failures']}번을 초과했습니다!")
     st.info("레벨 1부터 다시 시작합니다.")
     if st.button("🎮 레벨 1부터 다시 시작", type="primary", use_container_width=True):
         reset_to_level_1()
