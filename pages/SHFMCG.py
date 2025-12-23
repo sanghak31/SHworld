@@ -21,7 +21,7 @@ def get_level_config(level):
             'has_light': True, 'has_lock': False, 'has_ball': False},
         3: {'grid_rows': 4, 'grid_cols': 4, 'pairs': 7, 'max_failures': 6, 'bombs': 2,
             'has_light': True, 'has_lock': True, 'has_ball': False},
-        4: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 10, 'max_failures': 7, 'bombs': 5,
+        4: {'grid_rows': 4, 'grid_cols': 4, 'pairs': 7, 'max_failures': 7, 'bombs': 2,
             'has_light': True, 'has_lock': False, 'has_ball': True},
         5: {'grid_rows': 5, 'grid_cols': 5, 'pairs': 11, 'max_failures': 8, 'bombs': 3,
             'has_light': True, 'has_lock': True, 'has_ball': True},
