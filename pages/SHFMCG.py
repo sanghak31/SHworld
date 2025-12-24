@@ -33,7 +33,7 @@ for key in ['level', 'game_started', 'cards', 'revealed', 'matched', 'first_card
             'failures', 'matches_found', 'is_previewing', 'show_cards_until', 'bomb_indices',
             'light_indices', 'lock_indices', 'ball_indices', 'edge_indices',
             'bombs_revealed', 'lock_opened', 'auto_reveal_bombs', 'ball_positions', 'preview_start_time',
-            'bomb_hit']:
+            'bomb_hit', 'shown_tutorials']:
     if key not in st.session_state:
         if key == 'level':
             st.session_state[key] = 1
@@ -43,6 +43,8 @@ for key in ['level', 'game_started', 'cards', 'revealed', 'matched', 'first_card
             st.session_state[key] = None
         elif key in ['failures', 'matches_found']:
             st.session_state[key] = 0
+        elif key == 'shown_tutorials':
+            st.session_state[key] = set()
         else:
             st.session_state[key] = []
 
@@ -250,7 +252,7 @@ if is_preview:
     
     if remaining > 0:
         st.warning(f"⏱️ 카드 위치를 기억하세요! {remaining}초 남음...")
-        if st.button("✅ 맞출 준비가 되었습니다!", use_container_width=True, type="primary"):
+        if st.button("✅ 맞을 준비가 되었습니다!", use_container_width=True, type="primary"):
             stop_preview()
             st.rerun()
     else:
@@ -357,12 +359,26 @@ with col3:
 
 st.markdown("---")
 
-# 상태 메시지
-if config['has_lock'] and st.session_state.level == 3:
-    if st.session_state.lock_opened:
-        st.success("🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**")
-    else:
-        st.warning("🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**")
+# 특수 카드 튜토리얼 메시지 (게임 중 계속 표시)
+if st.session_state.game_started:
+    # 폭탄 카드 튜토리얼 (레벨 2에서 처음 등장)
+    if st.session_state.level == 2 and config['bombs'] > 0:
+        st.warning("💣 **폭탄을 건드리면 바로 패배합니다. 조심하세요!**")
+    
+    # 빛 카드 튜토리얼 (레벨 2에서 처음 등장)
+    if st.session_state.level == 2 and config['has_light']:
+        st.success("✨ **빛 카드의 쌍을 맞추면 다른 카드 쌍 하나를 찾아줍니다!**")
+    
+    # 자물쇠 카드 튜토리얼 (레벨 3에서 처음 등장)
+    if st.session_state.level == 3 and config['has_lock']:
+        if st.session_state.lock_opened:
+            st.success("🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**")
+        else:
+            st.warning("🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**")
+    
+    # 무도회 카드 튜토리얼 (레벨 4에서 처음 등장)
+    if st.session_state.level == 4 and config['has_ball']:
+        st.info("💃 **무도회 카드는 매 턴 가장자리를 따라 시계 방향으로 움직입니다!**")
 
 # 게임 오버
 if st.session_state.failures >= config['max_failures']:
