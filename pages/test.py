@@ -359,32 +359,26 @@ with col3:
 
 st.markdown("---")
 
-# 특수 카드 튜토리얼 메시지 (처음 한 번만 표시)
-if st.session_state.game_started and not st.session_state.is_previewing:
+# 특수 카드 튜토리얼 메시지 (게임 중 계속 표시)
+if st.session_state.game_started:
     # 폭탄 카드 튜토리얼 (레벨 2에서 처음 등장)
-    if st.session_state.level == 2 and 'bomb' not in st.session_state.shown_tutorials:
+    if st.session_state.level == 2 and config['bombs'] > 0:
         st.warning("💣 **폭탄을 건드리면 바로 패배합니다. 조심하세요!**")
-        st.session_state.shown_tutorials.add('bomb')
     
     # 빛 카드 튜토리얼 (레벨 2에서 처음 등장)
-    if st.session_state.level == 2 and 'light' not in st.session_state.shown_tutorials:
+    if st.session_state.level == 2 and config['has_light']:
         st.success("✨ **빛 카드의 쌍을 맞추면 다른 카드 쌍 하나를 찾아줍니다!**")
-        st.session_state.shown_tutorials.add('light')
     
     # 자물쇠 카드 튜토리얼 (레벨 3에서 처음 등장)
-    if st.session_state.level == 3 and 'lock' not in st.session_state.shown_tutorials:
-        st.warning("🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**")
-        st.session_state.shown_tutorials.add('lock')
+    if st.session_state.level == 3 and config['has_lock']:
+        if st.session_state.lock_opened:
+            st.success("🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**")
+        else:
+            st.warning("🔒 **자물쇠 카드를 열기 전까지 가장자리 카드를 선택할 수 없습니다!**")
     
     # 무도회 카드 튜토리얼 (레벨 4에서 처음 등장)
-    if st.session_state.level == 4 and 'ball' not in st.session_state.shown_tutorials:
+    if st.session_state.level == 4 and config['has_ball']:
         st.info("💃 **무도회 카드는 매 턴 가장자리를 따라 시계 방향으로 움직입니다!**")
-        st.session_state.shown_tutorials.add('ball')
-
-# 상태 메시지 (자물쇠)
-if config['has_lock'] and st.session_state.level == 3 and not st.session_state.is_previewing:
-    if st.session_state.lock_opened:
-        st.success("🔓 **자물쇠가 열렸습니다! 이제 가장자리 카드를 선택할 수 있습니다!**")
 
 # 게임 오버
 if st.session_state.failures >= config['max_failures']:
