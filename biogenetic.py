@@ -139,7 +139,6 @@ with col1:
     if st.button("🩸 헤모글로빈(HBB)"):
         st.session_state.dna_input = HBB_DNA
         st.rerun()
-        st.info("🩸 낫모양 적혈구 빈혈과 비교할 수 있습니다")
 
 with col2:
     if st.button("💉 인슐린(INS)"):
@@ -155,7 +154,6 @@ with col4:
         st.session_state.dna_input = SICKLE_HBB_DNA
         st.session_state.converted = False
         st.rerun()
-        st.info("🩸 헤모글로빈과 비교할 수 있습니다")
 
 
 
