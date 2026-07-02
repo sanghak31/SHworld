@@ -138,15 +138,18 @@ col1, col2, col3, col4= st.columns(4)
 with col1:
     if st.button("🩸 헤모글로빈(HBB)"):
         st.session_state.dna_input = HBB_DNA
+        st.session_state.converted = False
         st.rerun()
 
 with col2:
     if st.button("💉 인슐린(INS)"):
         st.session_state.dna_input = INS_DNA
+        st.session_state.converted = False
         st.rerun()
 with col3:
     if st.button("🦴 콜라겐(COL1A1)"):
         st.session_state.dna_input = COLLAGEN_DNA
+        st.session_state.converted = False
         st.rerun()
 
 with col4:
