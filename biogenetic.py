@@ -1,4 +1,6 @@
 import streamlit as st
+import random
+import math
 
 st.set_page_config(page_title="DNA 염기서열 변환기", page_icon="🧬")
 
@@ -85,6 +87,29 @@ codon_table = {
 
     "UAA":"종결","UAG":"종결","UGA":"종결"
 }
+
+# ==========================
+# 돌연변이 함수
+# ==========================
+def mutate_dna(sequence, mutation_count):
+
+    dna_list = list(sequence)
+
+    # 중복 없이 위치 선택
+    positions = random.sample(range(len(dna_list)), mutation_count)
+
+    for pos in positions:
+
+        current = dna_list[pos]
+
+        # 현재 염기를 제외한 나머지 중 하나 선택
+        candidates = ["A", "T", "G", "C"]
+        candidates.remove(current)
+
+        dna_list[pos] = random.choice(candidates)
+
+    return "".join(dna_list)
+    
 # ==========================
 # Session State 초기화
 # ==========================
@@ -136,7 +161,61 @@ dna = st.text_input(
 # ==========================
 # 변환 버튼
 # ==========================
-if st.button("🧬 염기서열 변환"):
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    convert = st.button("🧬 염기서열 변환")
+
+with col2:
+    small_mutation = st.button("🟢 돌연변이(소)")
+
+with col3:
+    medium_mutation = st.button("🟡 돌연변이(중)")
+
+with col4:
+    large_mutation = st.button("🔴 돌연변이(대)")
+
+
+# ==========================
+# 돌연변이 처리
+# ==========================
+if small_mutation or medium_mutation or large_mutation:
+
+    dna = st.session_state.dna_input.upper()
+
+    valid = {"A", "C", "G", "T"}
+
+    if len(dna) < 6:
+        st.error("최소 6개의 염기가 입력되어 있어야 합니다.")
+
+    elif not all(base in valid for base in dna):
+        st.error("A, C, G, T만 입력 가능합니다.")
+
+    else:
+
+        if small_mutation:
+            mutation_count = 1
+
+        elif medium_mutation:
+            mutation_count = max(2, math.ceil(len(dna) * 0.1))
+
+        else:
+            mutation_count = max(3, math.ceil(len(dna) / 3))
+
+        st.session_state.dna_input = mutate_dna(
+            dna,
+            mutation_count
+        )
+
+        st.session_state.converted = False
+
+        st.rerun()
+
+
+# ==========================
+# 변환
+# ==========================
+if convert:
 
     dna = st.session_state.dna_input.upper()
 
@@ -151,6 +230,27 @@ if st.button("🧬 염기서열 변환"):
     else:
 
         st.session_state.converted = True
+
+        opposite_dna = "".join(dna_pair[b] for b in dna)
+
+        rna = opposite_dna.replace("T", "U")
+
+        amino_list = []
+
+        for i in range(0, len(rna), 3):
+
+            codon = rna[i:i+3]
+
+            if len(codon) == 3:
+                amino_list.append(codon_table.get(codon, "알수없음"))
+            else:
+                amino_list.append("알수없음")
+
+        amino_result = " - ".join(amino_list)
+
+        st.session_state.opposite = opposite_dna
+        st.session_state.rna = rna
+        st.session_state.amino = amino_result
 
         # -------------------
         # 상보적 DNA
