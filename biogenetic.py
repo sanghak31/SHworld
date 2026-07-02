@@ -106,21 +106,21 @@ COLLAGEN_DNA = "ATGGTGCTGCTGGCCCTGCTGGCCCTGCTG"
 
 # 초기 상태일 때만 프리셋 버튼 표시
 
-    col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-    with col1:
-        if st.button("🩸 헤모글로빈(HBB)"):
-            st.session_state.dna_input = HBB_DNA
-            st.rerun()
+with col1:
+    if st.button("🩸 헤모글로빈(HBB)"):
+        st.session_state.dna_input = HBB_DNA
+        st.rerun()
 
-    with col2:
-        if st.button("💉 인슐린(INS)"):
-            st.session_state.dna_input = INS_DNA
-            st.rerun()
-    with col3:
-        if st.button("🦴 콜라겐(COL1A1)"):
-            st.session_state.dna_input = COLLAGEN_DNA
-            st.rerun()
+with col2:
+    if st.button("💉 인슐린(INS)"):
+        st.session_state.dna_input = INS_DNA
+        st.rerun()
+with col3:
+    if st.button("🦴 콜라겐(COL1A1)"):
+        st.session_state.dna_input = COLLAGEN_DNA
+        st.rerun()
 
 
 
