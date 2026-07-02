@@ -363,7 +363,7 @@ if st.session_state.converted:
     )
 
     if st.session_state.gc_content >= 60:
-    st.info("GC 함량이 높은 DNA입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
+        st.info("GC 함량이 높은 DNA입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
 
     elif st.session_state.gc_content >= 40:
         st.info("GC 함량이 평균적인 수준입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
