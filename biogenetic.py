@@ -346,10 +346,7 @@ if st.session_state.converted:
     st.markdown(color_sequence(st.session_state.rna),
                 unsafe_allow_html=True)
 
-    st.metric(
-        "DNA 길이",
-        f"{st.session_state.total} bp"
-    )
+
 
     st.write("### 염기 개수 통계")
 
