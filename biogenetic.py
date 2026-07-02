@@ -268,6 +268,21 @@ if convert:
         opposite_dna = "".join(dna_pair[b] for b in dna)
 
         # -------------------
+        #  염기 개수 통계
+        # -------------------
+        count_A = dna.count("A")
+        count_T = dna.count("T")
+        count_G = dna.count("G")
+        count_C = dna.count("C")
+        
+        total = len(dna)
+
+        # -------------------
+        # GC 함량
+        # -------------------
+        gc_content = ((count_G + count_C) / total) * 100
+
+        # -------------------
         # RNA
         # -------------------
         rna = opposite_dna.replace("T", "U")
@@ -330,6 +345,31 @@ if st.session_state.converted:
     st.write("## RNA")
     st.markdown(color_sequence(st.session_state.rna),
                 unsafe_allow_html=True)
+
+    st.write("### 염기 개수 통계")
+
+    col1, col2, col3, col4 = st.columns(4)
+    
+    col1.metric("🟢 A", st.session_state.count_A)
+    col2.metric("🔴 T", st.session_state.count_T)
+    col3.metric("🟡 G", st.session_state.count_G)
+    col4.metric("🔵 C", st.session_state.count_C)
+
+    st.write("### GC 함량")
+
+    st.metric(
+        label="GC 함량",
+        value=f"{st.session_state.gc_content:.1f}%"
+    )
+
+    if st.session_state.gc_content >= 60:
+    st.info("GC 함량이 높은 DNA입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
+
+    elif st.session_state.gc_content >= 40:
+        st.info("GC 함량이 평균적인 수준입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
+
+    else:
+        st.info("GC 함량이 비교적 낮은 DNA입니다.\n일반적으로 GC 결합이 많을수록 이중가닥이 더 안정적인 경향이 있습니다.")
 
     st.write("## 시작 / 종결 코돈 분석")
 
