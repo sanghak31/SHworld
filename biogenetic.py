@@ -85,19 +85,62 @@ codon_table = {
 
     "UAA":"종결","UAG":"종결","UGA":"종결"
 }
+# ==========================
+# Session State 초기화
+# ==========================
+if "dna_input" not in st.session_state:
+    st.session_state.dna_input = ""
+
+if "converted" not in st.session_state:
+    st.session_state.converted = False
+
 
 # ==========================
-# 입력
+# 프리셋
 # ==========================
-dna = st.text_input("DNA 염기서열 입력")
+HBB_DNA = "ATGGTGCACCTGACTCCTGAGGAGAAGTCT"
 
-if dna:
+# 초기 상태일 때만 프리셋 버튼 표시
+if not st.session_state.converted:
 
-    dna = dna.upper()
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🩸 헤모글로빈(HBB)"):
+            st.session_state.dna_input = HBB_DNA
+            st.rerun()
+
+    with col2:
+        st.button("백혈구(준비중)", disabled=True)
+
+
+# ==========================
+# 입력창
+# ==========================
+dna = st.text_input(
+    "DNA 염기서열 입력",
+    key="dna_input"
+)
+
+
+# ==========================
+# 변환 버튼
+# ==========================
+if st.button("🧬 염기서열 변환"):
+
+    dna = st.session_state.dna_input.upper()
 
     valid = {"A", "C", "G", "T"}
 
-    if all(base in valid for base in dna):
+    if dna == "":
+        st.error("DNA를 입력하세요.")
+
+    elif not all(base in valid for base in dna):
+        st.error("❌ 제대로 입력하세요! (A, C, G, T만 입력 가능합니다.)")
+
+    else:
+
+        st.session_state.converted = True
 
         # -------------------
         # 상보적 DNA
@@ -119,37 +162,65 @@ if dna:
             codon = rna[i:i+3]
 
             if len(codon) == 3:
-                amino = codon_table.get(codon, "알수없음")
-                amino_list.append(amino)
-
+                amino_list.append(codon_table.get(codon, "알수없음"))
             else:
                 amino_list.append("알수없음")
 
         amino_result = " - ".join(amino_list)
 
-        # ==========================
-        # 출력
-        # ==========================
+        # 결과 저장
+        st.session_state.opposite = opposite_dna
+        st.session_state.rna = rna
+        st.session_state.amino = amino_result
 
-        st.success("변환 완료!")
 
-        st.write("## 입력한 DNA")
-        st.markdown(color_sequence(dna), unsafe_allow_html=True)
+# ==========================
+# 결과 출력
+# ==========================
+if st.session_state.converted:
 
-        st.write("## 반대쪽 DNA")
-        st.markdown(color_sequence(opposite_dna), unsafe_allow_html=True)
+    st.success("변환 완료!")
 
-        st.write("## RNA")
-        st.markdown(color_sequence(rna), unsafe_allow_html=True)
+    st.write("## 입력한 DNA")
+    st.markdown(color_sequence(st.session_state.dna_input.upper()),
+                unsafe_allow_html=True)
 
-        st.write("## 아미노산")
-        st.success(amino_result)
+    st.write("## 반대쪽 DNA")
+    st.markdown(color_sequence(st.session_state.opposite),
+                unsafe_allow_html=True)
 
-        st.divider()
+    st.write("## RNA")
+    st.markdown(color_sequence(st.session_state.rna),
+                unsafe_allow_html=True)
 
-        st.write(f'**반대쪽 DNA의 염기서열은 "{opposite_dna}" 입니다.**')
-        st.write(f'**RNA의 염기서열은 "{rna}" 입니다.**')
-        st.write(f'**아미노산 : {amino_result}**')
+    st.write("## 아미노산")
+    st.success(st.session_state.amino)
 
-    else:
-        st.error("❌ 제대로 입력하세요! (A, C, G, T만 입력 가능합니다.)")
+    st.divider()
+
+    st.write(
+        f'**반대쪽 DNA의 염기서열은 "{st.session_state.opposite}" 입니다.**'
+    )
+
+    st.write(
+        f'**RNA의 염기서열은 "{st.session_state.rna}" 입니다.**'
+    )
+
+    st.write(
+        f'**아미노산 : {st.session_state.amino}**'
+    )
+
+    # -------------------
+    # 초기화 버튼
+    # -------------------
+    if st.button("🔄 초기화"):
+
+        st.session_state.dna_input = ""
+        st.session_state.converted = False
+
+        # 결과 삭제
+        for key in ["opposite", "rna", "amino"]:
+            if key in st.session_state:
+                del st.session_state[key]
+
+        st.rerun()
