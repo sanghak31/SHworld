@@ -139,6 +139,7 @@ with col1:
     if st.button("🩸 헤모글로빈(HBB)"):
         st.session_state.dna_input = HBB_DNA
         st.rerun()
+    st.info("대표적인 낫모양 적혈구 빈혈도 볼 수 있습니다")
 
 with col2:
     if st.button("💉 인슐린(INS)"):
@@ -154,11 +155,6 @@ with col4:
         st.session_state.dna_input = SICKLE_HBB_DNA
         st.session_state.converted = False
         st.rerun()
-
-if st.session_state.dna_input == HBB_DNA:
-    st.info("🩸 정상 헤모글로빈(HBB) 유전자 예시입니다.")
-
-elif st.session_state.dna_input == SICKLE_HBB_DNA:
     st.warning(
         "⚠️ 낫적혈구빈혈(HBB) 돌연변이 예시입니다.\n\n"
         "β-글로빈 유전자의 한 염기 치환으로 인해 "
