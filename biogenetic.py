@@ -129,9 +129,11 @@ INS_DNA = "ATGGCCCTGTGGATGCGCCTCCTGCCCCTG"
 
 COLLAGEN_DNA = "ATGGTGCTGCTGGCCCTGCTGGCCCTGCTG"
 
+SICKLE_HBB_DNA = "ATGGTGCACCTGACTCCTGTGGAGAAGTCT"
+
 # 초기 상태일 때만 프리셋 버튼 표시
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4= st.columns(3)
 
 with col1:
     if st.button("🩸 헤모글로빈(HBB)"):
@@ -146,6 +148,22 @@ with col3:
     if st.button("🦴 콜라겐(COL1A1)"):
         st.session_state.dna_input = COLLAGEN_DNA
         st.rerun()
+
+with col4:
+    if st.button("🩸 낫모양 적혈구 빈혈"):
+        st.session_state.dna_input = SICKLE_HBB_DNA
+        st.session_state.converted = False
+        st.rerun()
+
+if st.session_state.dna_input == HBB_DNA:
+    st.info("🩸 정상 헤모글로빈(HBB) 유전자 예시입니다.")
+
+elif st.session_state.dna_input == SICKLE_HBB_DNA:
+    st.warning(
+        "⚠️ 낫적혈구빈혈(HBB) 돌연변이 예시입니다.\n\n"
+        "β-글로빈 유전자의 한 염기 치환으로 인해 "
+        "글루탐산(Glu)이 발린(Val)으로 바뀌는 대표적인 점 돌연변이입니다."
+    )
 
 
 
