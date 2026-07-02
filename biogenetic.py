@@ -105,9 +105,8 @@ INS_DNA = "ATGGCCCTGTGGATGCGCCTCCTGCCCCTG"
 COLLAGEN_DNA = "ATGGTGCTGCTGGCCCTGCTGGCCCTGCTG"
 
 # 초기 상태일 때만 프리셋 버튼 표시
-if not st.session_state.converted:
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         if st.button("🩸 헤모글로빈(HBB)"):
@@ -220,18 +219,3 @@ if st.session_state.converted:
     st.write(
         f'**아미노산 : {st.session_state.amino}**'
     )
-
-    # -------------------
-    # 초기화 버튼
-    # -------------------
-    if st.button("🔄 초기화"):
-
-        st.session_state.dna_input = ""
-        st.session_state.converted = False
-
-        # 결과 삭제
-        for key in ["opposite", "rna", "amino"]:
-            if key in st.session_state:
-                del st.session_state[key]
-
-        st.rerun()
