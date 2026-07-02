@@ -100,10 +100,14 @@ if "converted" not in st.session_state:
 # ==========================
 HBB_DNA = "ATGGTGCACCTGACTCCTGAGGAGAAGTCT"
 
+INS_DNA = "ATGGCCCTGTGGATGCGCCTCCTGCCCCTG"
+
+COLLAGEN_DNA = "ATGGTGCTGCTGGCCCTGCTGGCCCTGCTG"
+
 # 초기 상태일 때만 프리셋 버튼 표시
 if not st.session_state.converted:
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         if st.button("🩸 헤모글로빈(HBB)"):
@@ -111,7 +115,14 @@ if not st.session_state.converted:
             st.rerun()
 
     with col2:
-        st.button("백혈구(준비중)", disabled=True)
+        if st.button("💉 인슐린(INS)"):
+            st.session_state.dna_input = INS_DNA
+            st.rerun()
+    with col3:
+        if st.button("🦴 콜라겐(COL1A1)"):
+            st.session_state.dna_input = COLLAGEN_DNA
+            st.rerun()
+
 
 
 # ==========================
