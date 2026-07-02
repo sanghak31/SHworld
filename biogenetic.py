@@ -155,8 +155,9 @@ with col3:
 dna = st.text_input(
     "DNA 염기서열 입력",
     value=st.session_state.dna_input
-    st.session_state.dna_input = dna
 )
+
+st.session_state.dna_input = dna
 
 
 # ==========================
