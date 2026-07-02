@@ -273,6 +273,22 @@ if convert:
         rna = opposite_dna.replace("T", "U")
 
         # -------------------
+    # 시작/종결 코돈 분석
+    # -------------------
+    start_exists = "AUG" in rna
+    
+    stop_codons = []
+
+    if "UAA" in rna:
+        stop_codons.append("UAA")
+
+    if "UAG" in rna:
+        stop_codons.append("UAG")
+
+    if "UGA" in rna:
+        stop_codons.append("UGA")
+
+        # -------------------
         # 아미노산
         # -------------------
         amino_list = []
@@ -292,6 +308,8 @@ if convert:
         st.session_state.opposite = opposite_dna
         st.session_state.rna = rna
         st.session_state.amino = amino_result
+        st.session_state.start_exists = start_exists
+        st.session_state.stop_codons = stop_codons
 
 
 # ==========================
@@ -312,6 +330,22 @@ if st.session_state.converted:
     st.write("## RNA")
     st.markdown(color_sequence(st.session_state.rna),
                 unsafe_allow_html=True)
+
+    st.write("## 시작 / 종결 코돈 분석")
+
+    if st.session_state.start_exists:
+        st.success("🟢 시작 코돈(AUG) 발견")
+    else:
+        st.warning("🟡 시작 코돈(AUG)을 찾지 못했습니다.")
+
+    if len(st.session_state.stop_codons) == 0:
+        st.warning("🟡 종결 코돈(UAA, UAG, UGA)을 찾지 못했습니다.")
+
+    else:
+        st.success(
+            "🔴 종결 코돈 발견 : "
+            + ", ".join(st.session_state.stop_codons)
+        )
 
     st.write("## 아미노산")
     st.success(st.session_state.amino)
