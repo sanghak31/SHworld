@@ -406,6 +406,42 @@ if st.session_state.converted:
             + ", ".join(st.session_state.stop_codons)
         )
 
+    # ==========================
+    # DNA 이중가닥 표시
+    # ==========================
+    def double_strand_html(top, bottom):
+    
+        html = """
+        <div style="
+            font-family:Consolas, monospace;
+            font-size:28px;
+            line-height:1.4;
+            white-space:pre;
+        ">
+        """
+
+        # 윗가닥
+        for base in top:
+            color = colors.get(base, "black")
+            html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
+
+        html += "<br>"
+
+        # 가운데 연결선
+        for _ in top:
+            html += '<span style="color:#777;">│</span> '
+
+        html += "<br>"
+
+        # 아랫가닥
+        for base in bottom:
+            color = colors.get(base, "black")
+            html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
+
+        html += "</div>"
+
+        return html
+
     st.write("## 아미노산")
     st.success(st.session_state.amino)
 
