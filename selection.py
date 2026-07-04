@@ -8,6 +8,7 @@ st.set_page_config(page_title="자연선택 개체군 시뮬레이터", layout="
 # ------------------------------------------------------------
 DEFAULT_INITIAL_POPULATION = 90   # 시초 개체수 기본값
 DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
+DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
 
 GENE1_GENOTYPES = ["AA", "Aa", "aa"]
 GENE2_GENOTYPES = ["BB", "Bb", "bb"]
@@ -49,6 +50,25 @@ def mate(parent1: str, parent2: str) -> str:
     child_gene1 = "".join(sorted([gamete(p1_gene1), gamete(p2_gene1)]))
     child_gene2 = "".join(sorted([gamete(p1_gene2), gamete(p2_gene2)]))
     return child_gene1 + child_gene2
+
+
+def apply_death(population: dict, death_rate: float):
+    """교배 후의 전체 개체군에서 사망 비율만큼 무작위로 개체를 제거"""
+    individuals = []
+    for genotype, count in population.items():
+        individuals.extend([genotype] * count)
+
+    total = len(individuals)
+    num_death = round(total * death_rate)
+    num_death = min(num_death, total)
+
+    dead = random.sample(individuals, num_death)
+
+    new_population = dict(population)
+    for genotype in dead:
+        new_population[genotype] -= 1
+
+    return new_population, num_death
 
 
 def next_generation(population: dict, reproduction_rate: float):
@@ -103,7 +123,7 @@ st.title("🧬 자연선택 개체군 시뮬레이터")
 st.header("⚙️ 옵션 설정")
 st.caption("현재 대립유전자는 A/a, B/b 두 쌍만 지원됩니다. (추가 대립유전자 옵션은 추후 구현 예정)")
 
-opt_col1, opt_col2 = st.columns(2)
+opt_col1, opt_col2, opt_col3 = st.columns(3)
 
 with opt_col1:
     initial_population_input = st.number_input(
@@ -124,6 +144,16 @@ with opt_col2:
         value=DEFAULT_REPRODUCTION_RATE,
         step=1,
         help="매 세대마다 전체 개체 중 교배에 참여할 개체의 비율입니다.",
+    )
+
+with opt_col3:
+    death_rate_input = st.slider(
+        "사망 비율 (%)",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_DEATH_RATE,
+        step=1,
+        help="매 세대 교배가 끝난 후, 전체 개체 중 무작위로 사망하는 비율입니다.",
     )
 
 if st.session_state.started:
@@ -149,15 +179,23 @@ with col1:
 
 with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
-        new_population, offspring_counts, num_mated = next_generation(
+        # 1. 교배 진행 (자손 생성)
+        mated_population, offspring_counts, num_mated = next_generation(
             st.session_state.population, reproduction_rate_input / 100
         )
-        st.session_state.population = new_population
-        st.session_state.generation += 1
         num_offspring = sum(offspring_counts.values())
+
+        # 2. 교배 후 전체 개체군에서 사망 비율만큼 무작위 제거
+        final_population, num_death = apply_death(
+            mated_population, death_rate_input / 100
+        )
+
+        st.session_state.population = final_population
+        st.session_state.generation += 1
         st.session_state.logs.append(
             f"[{st.session_state.generation}세대] 자손 생성율 {reproduction_rate_input}% 적용 - "
-            f"{num_mated}마리가 교배하여 {num_offspring}마리의 새로운 개체가 태어났습니다."
+            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생 / "
+            f"사망 비율 {death_rate_input}% 적용 - {num_death}마리 사망"
         )
 
 with col3:
