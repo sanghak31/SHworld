@@ -4,10 +4,10 @@ import random
 st.set_page_config(page_title="자연선택 개체군 시뮬레이터", layout="centered")
 
 # ------------------------------------------------------------
-# 상수 설정
+# 기본값 설정 (옵션 설정에서 조절 가능)
 # ------------------------------------------------------------
-INITIAL_POPULATION = 90     # 시초 개체수
-REPRODUCTION_RATE = 0.5     # 자손 생성율 (50%)
+DEFAULT_INITIAL_POPULATION = 90   # 시초 개체수 기본값
+DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
 
 GENE1_GENOTYPES = ["AA", "Aa", "aa"]
 GENE2_GENOTYPES = ["BB", "Bb", "bb"]
@@ -18,13 +18,21 @@ ALL_GENOTYPES = [g1 + g2 for g1 in GENE1_GENOTYPES for g2 in GENE2_GENOTYPES]
 # 시뮬레이션 로직 함수
 # ------------------------------------------------------------
 def init_population(total: int) -> dict:
-    """시초 개체수를 9개 유전자형에 균등하게 분배"""
+    """시초 개체수를 9개 유전자형에 분배.
+    - 균등하게 나눠 떨어지는 몫(base)은 모든 유전자형에 동일하게 배분
+    - 나머지(remainder)는 서로 다른 유전자형에 최대 1마리씩만 무작위로 추가 배분
+      (remainder는 항상 유전자형 개수보다 작으므로, 특정 유전자형이
+       다른 유전자형보다 2마리 이상 더 많이 받는 일은 발생하지 않음)
+    """
     n = len(ALL_GENOTYPES)
     base = total // n
     remainder = total % n
-    pop = {}
-    for i, g in enumerate(ALL_GENOTYPES):
-        pop[g] = base + (1 if i < remainder else 0)
+
+    pop = {g: base for g in ALL_GENOTYPES}
+    if remainder > 0:
+        lucky_genotypes = random.sample(ALL_GENOTYPES, remainder)
+        for g in lucky_genotypes:
+            pop[g] += 1
     return pop
 
 
@@ -93,7 +101,33 @@ if "started" not in st.session_state:
 st.title("🧬 자연선택 개체군 시뮬레이터")
 
 st.header("⚙️ 옵션 설정")
-st.info("옵션 설정 기능은 추후 구현 예정입니다. (현재: 대립유전자 A/a, B/b · 시초 개체수 90 · 자손 생성율 50%)")
+st.caption("현재 대립유전자는 A/a, B/b 두 쌍만 지원됩니다. (추가 대립유전자 옵션은 추후 구현 예정)")
+
+opt_col1, opt_col2 = st.columns(2)
+
+with opt_col1:
+    initial_population_input = st.number_input(
+        "시초 개체수",
+        min_value=1,
+        max_value=100000,
+        value=DEFAULT_INITIAL_POPULATION,
+        step=1,
+        disabled=st.session_state.started,
+        help="시뮬레이션 시작 시 전체 개체수입니다. 시작 후에는 변경할 수 없습니다.",
+    )
+
+with opt_col2:
+    reproduction_rate_input = st.slider(
+        "자손 생성율 (%)",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_REPRODUCTION_RATE,
+        step=1,
+        help="매 세대마다 전체 개체 중 교배에 참여할 개체의 비율입니다.",
+    )
+
+if st.session_state.started:
+    st.caption("※ 시초 개체수는 시작 전에만 변경할 수 있고, 자손 생성율은 다음 세대부터 즉시 적용됩니다.")
 
 st.divider()
 
@@ -106,24 +140,24 @@ col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
     if st.button("시뮬레이터 시작하기"):
-        st.session_state.population = init_population(INITIAL_POPULATION)
+        st.session_state.population = init_population(initial_population_input)
         st.session_state.generation = 1
         st.session_state.started = True
         st.session_state.logs.append(
-            f"[시작] 시초 개체수 {INITIAL_POPULATION}마리로 시뮬레이션을 시작했습니다. (1세대)"
+            f"[시작] 시초 개체수 {initial_population_input}마리로 시뮬레이션을 시작했습니다. (1세대)"
         )
 
 with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
         new_population, offspring_counts, num_mated = next_generation(
-            st.session_state.population, REPRODUCTION_RATE
+            st.session_state.population, reproduction_rate_input / 100
         )
         st.session_state.population = new_population
         st.session_state.generation += 1
         num_offspring = sum(offspring_counts.values())
         st.session_state.logs.append(
-            f"[{st.session_state.generation}세대] {num_mated}마리가 교배하여 "
-            f"{num_offspring}마리의 새로운 개체가 태어났습니다."
+            f"[{st.session_state.generation}세대] 자손 생성율 {reproduction_rate_input}% 적용 - "
+            f"{num_mated}마리가 교배하여 {num_offspring}마리의 새로운 개체가 태어났습니다."
         )
 
 with col3:
