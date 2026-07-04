@@ -97,7 +97,7 @@ def apply_death(population: dict, death_rate: float):
     return new_population, num_death
 
 
-def next_generation(population: dict, reproduction_rate: float):
+def next_generation(population: dict, reproduction_rate: float, num_genes: int):
     """한 세대를 진행시켜 새로운 개체군을 반환"""
     # 1. 개체 목록 전개 (유전자형별 개체수만큼 리스트에 펼침)
     individuals = []
@@ -120,7 +120,7 @@ def next_generation(population: dict, reproduction_rate: float):
     offspring_counts = {}
     for i in range(0, len(selected), 2):
         parent1, parent2 = selected[i], selected[i + 1]
-        child = mate(parent1, parent2)
+        child = mate(parent1, parent2, num_genes)
         offspring_counts[child] = offspring_counts.get(child, 0) + 1
 
     # 5. 기존 개체군에 자손을 더함 (부모 개체는 그대로 유지)
@@ -139,6 +139,7 @@ if "started" not in st.session_state:
     st.session_state.generation = 0
     st.session_state.population = {}
     st.session_state.logs = []
+    st.session_state.num_genes = DEFAULT_NUM_GENES
 
 
 # ------------------------------------------------------------
@@ -147,11 +148,25 @@ if "started" not in st.session_state:
 st.title("🧬 자연선택 개체군 시뮬레이터")
 
 st.header("⚙️ 옵션 설정")
-st.caption("현재 대립유전자는 A/a, B/b 두 쌍만 지원됩니다. (추가 대립유전자 옵션은 추후 구현 예정)")
 
-opt_col1, opt_col2, opt_col3 = st.columns(3)
+opt_col1, opt_col2, opt_col3, opt_col4 = st.columns(4)
 
 with opt_col1:
+    num_genes_input = st.number_input(
+        "대립유전자의 수",
+        min_value=MIN_GENES,
+        max_value=MAX_GENES,
+        value=DEFAULT_NUM_GENES,
+        step=1,
+        disabled=st.session_state.started,
+        help=f"사용할 유전자 쌍의 개수입니다 (1~{MAX_GENES}). 예: 4 -> A/a, B/b, C/c, D/d 사용.",
+    )
+    used_letters = ", ".join(
+        f"{l}/{l.lower()}" for l in get_gene_letters(num_genes_input)
+    )
+    st.caption(f"사용되는 대립유전자: {used_letters}")
+
+with opt_col2:
     initial_population_input = st.number_input(
         "시초 개체수",
         min_value=1,
@@ -162,7 +177,7 @@ with opt_col1:
         help="시뮬레이션 시작 시 전체 개체수입니다. 시작 후에는 변경할 수 없습니다.",
     )
 
-with opt_col2:
+with opt_col3:
     reproduction_rate_input = st.slider(
         "자손 생성율 (%)",
         min_value=0,
@@ -172,7 +187,7 @@ with opt_col2:
         help="매 세대마다 전체 개체 중 교배에 참여할 개체의 비율입니다.",
     )
 
-with opt_col3:
+with opt_col4:
     death_rate_input = st.slider(
         "사망 비율 (%)",
         min_value=0,
@@ -183,7 +198,7 @@ with opt_col3:
     )
 
 if st.session_state.started:
-    st.caption("※ 시초 개체수는 시작 전에만 변경할 수 있고, 자손 생성율은 다음 세대부터 즉시 적용됩니다.")
+    st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 자손 생성율·사망 비율은 다음 세대부터 즉시 적용됩니다.")
 
 st.divider()
 
@@ -196,18 +211,23 @@ col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
     if st.button("시뮬레이터 시작하기"):
-        st.session_state.population = init_population(initial_population_input)
+        st.session_state.num_genes = num_genes_input
+        st.session_state.population = init_population(initial_population_input, num_genes_input)
         st.session_state.generation = 1
         st.session_state.started = True
+        used_letters_log = ", ".join(
+            f"{l}/{l.lower()}" for l in get_gene_letters(num_genes_input)
+        )
         st.session_state.logs.append(
-            f"[시작] 시초 개체수 {initial_population_input}마리로 시뮬레이션을 시작했습니다. (1세대)"
+            f"[시작] 대립유전자 {num_genes_input}쌍({used_letters_log}), "
+            f"시초 개체수 {initial_population_input}마리로 시뮬레이션을 시작했습니다. (1세대)"
         )
 
 with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
         # 1. 교배 진행 (자손 생성)
         mated_population, offspring_counts, num_mated = next_generation(
-            st.session_state.population, reproduction_rate_input / 100
+            st.session_state.population, reproduction_rate_input / 100, st.session_state.num_genes
         )
         num_offspring = sum(offspring_counts.values())
 
