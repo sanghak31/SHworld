@@ -10,6 +10,7 @@ DEFAULT_INITIAL_POPULATION = 90   # 시초 개체수 기본값
 DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
 DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
 DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
+DEFAULT_DISPLAY_COUNT = 10         # 표시할 유전자형 수 기본값
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
@@ -149,9 +150,9 @@ st.title("🧬 자연선택 개체군 시뮬레이터")
 
 st.header("⚙️ 옵션 설정")
 
-opt_col1, opt_col2, opt_col3, opt_col4 = st.columns(4)
+opt_row1_col1, opt_row1_col2, opt_row1_col3 = st.columns(3)
 
-with opt_col1:
+with opt_row1_col1:
     num_genes_input = st.number_input(
         "대립유전자의 수",
         min_value=MIN_GENES,
@@ -166,7 +167,7 @@ with opt_col1:
     )
     st.caption(f"사용되는 대립유전자: {used_letters}")
 
-with opt_col2:
+with opt_row1_col2:
     initial_population_input = st.number_input(
         "시초 개체수",
         min_value=1,
@@ -177,7 +178,20 @@ with opt_col2:
         help="시뮬레이션 시작 시 전체 개체수입니다. 시작 후에는 변경할 수 없습니다.",
     )
 
-with opt_col3:
+with opt_row1_col3:
+    max_display = 3 ** num_genes_input
+    display_count_input = st.number_input(
+        "표시할 유전자형의 수",
+        min_value=1,
+        max_value=max_display,
+        value=min(DEFAULT_DISPLAY_COUNT, max_display),
+        step=1,
+        help="개체수 비율이 높은 순서대로 상위 몇 개의 유전자형을 표시할지 정합니다.",
+    )
+
+opt_row2_col1, opt_row2_col2 = st.columns(2)
+
+with opt_row2_col1:
     reproduction_rate_input = st.slider(
         "자손 생성율 (%)",
         min_value=0,
@@ -187,7 +201,7 @@ with opt_col3:
         help="매 세대마다 전체 개체 중 교배에 참여할 개체의 비율입니다.",
     )
 
-with opt_col4:
+with opt_row2_col2:
     death_rate_input = st.slider(
         "사망 비율 (%)",
         min_value=0,
@@ -255,7 +269,7 @@ if st.session_state.started:
     total = sum(st.session_state.population.values())
     sorted_items = sorted(
         st.session_state.population.items(), key=lambda x: x[1], reverse=True
-    )[:10]
+    )[:display_count_input]
 
     for i in range(0, len(sorted_items), 2):
         row = st.columns(2)
