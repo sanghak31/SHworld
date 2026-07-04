@@ -11,6 +11,7 @@ DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
 DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
 DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
 DEFAULT_DISPLAY_COUNT = 10         # 표시할 유전자형 수 기본값
+DEFAULT_MAX_POPULATION = 1000      # 최대 개체수 기본값
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
@@ -77,6 +78,29 @@ def mate(parent1: str, parent2: str, num_genes: int) -> str:
         child_pair = "".join(sorted([gamete(p1_pair), gamete(p2_pair)]))
         child_parts.append(child_pair)
     return "".join(child_parts)
+
+
+def apply_max_population_cap(population: dict, max_population: int):
+    """전체 개체수가 최대 개체수를 초과하면, 초과한 수만큼 무작위로 개체를 제거.
+    (새로 태어난 개체와 기존 개체 구분 없이 전체 개체 중에서 무작위로 제거)
+    """
+    total = sum(population.values())
+    if total <= max_population:
+        return population, 0
+
+    excess = total - max_population
+
+    individuals = []
+    for genotype, count in population.items():
+        individuals.extend([genotype] * count)
+
+    removed = random.sample(individuals, excess)
+
+    new_population = dict(population)
+    for genotype in removed:
+        new_population[genotype] -= 1
+
+    return new_population, excess
 
 
 def apply_death(population: dict, death_rate: float):
@@ -189,7 +213,7 @@ with opt_row1_col3:
         help="개체수 비율이 높은 순서대로 상위 몇 개의 유전자형을 표시할지 정합니다.",
     )
 
-opt_row2_col1, opt_row2_col2 = st.columns(2)
+opt_row2_col1, opt_row2_col2, opt_row2_col3 = st.columns(3)
 
 with opt_row2_col1:
     reproduction_rate_input = st.slider(
@@ -209,6 +233,16 @@ with opt_row2_col2:
         value=DEFAULT_DEATH_RATE,
         step=1,
         help="매 세대 교배가 끝난 후, 전체 개체 중 무작위로 사망하는 비율입니다.",
+    )
+
+with opt_row2_col3:
+    max_population_input = st.number_input(
+        "최대 개체수",
+        min_value=1,
+        max_value=1000000,
+        value=DEFAULT_MAX_POPULATION,
+        step=1,
+        help="전체 개체수의 상한선입니다. 교배로 인해 이를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 개체가 죽습니다.",
     )
 
 if st.session_state.started:
@@ -245,16 +279,22 @@ with col2:
         )
         num_offspring = sum(offspring_counts.values())
 
-        # 2. 교배 후 전체 개체군에서 사망 비율만큼 무작위 제거
+        # 2. 최대 개체수를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
+        capped_population, num_capped = apply_max_population_cap(
+            mated_population, max_population_input
+        )
+
+        # 3. 사망 비율만큼 무작위 제거
         final_population, num_death = apply_death(
-            mated_population, death_rate_input / 100
+            capped_population, death_rate_input / 100
         )
 
         st.session_state.population = final_population
         st.session_state.generation += 1
+        cap_log = f" / 최대 개체수({max_population_input}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         st.session_state.logs.append(
             f"[{st.session_state.generation}세대] 자손 생성율 {reproduction_rate_input}% 적용 - "
-            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생 / "
+            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{cap_log} / "
             f"사망 비율 {death_rate_input}% 적용 - {num_death}마리 사망"
         )
 
