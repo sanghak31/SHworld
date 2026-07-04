@@ -9,29 +9,52 @@ st.set_page_config(page_title="자연선택 개체군 시뮬레이터", layout="
 DEFAULT_INITIAL_POPULATION = 90   # 시초 개체수 기본값
 DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
 DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
+DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
 
-GENE1_GENOTYPES = ["AA", "Aa", "aa"]
-GENE2_GENOTYPES = ["BB", "Bb", "bb"]
-ALL_GENOTYPES = [g1 + g2 for g1 in GENE1_GENOTYPES for g2 in GENE2_GENOTYPES]
+GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
+MAX_GENES = 10
+MIN_GENES = 1
+
+
+def get_gene_letters(num_genes: int) -> list:
+    """유전자 개수에 따라 사용할 알파벳 리스트 반환 (예: 3 -> ['A','B','C'])"""
+    return list(GENE_LETTERS[:num_genes])
+
+
+def generate_all_genotypes(num_genes: int) -> list:
+    """유전자 개수에 따라 가능한 모든 유전자형 조합 생성.
+    각 유전자는 대문자쌍(AA)/이형(Aa)/소문자쌍(aa) 3가지 상태를 가지며,
+    유전자형 문자열은 각 유전자의 2글자 쌍을 순서대로 이어붙인 형태입니다.
+    (예: 유전자 3개 -> 'AABbCc' 처럼 6글자)
+    """
+    letters = get_gene_letters(num_genes)
+    gene_options = [[letter + letter, letter + letter.lower(), letter.lower() + letter.lower()]
+                     for letter in letters]
+
+    genotypes = [""]
+    for options in gene_options:
+        genotypes = [prefix + option for prefix in genotypes for option in options]
+    return genotypes
 
 
 # ------------------------------------------------------------
 # 시뮬레이션 로직 함수
 # ------------------------------------------------------------
-def init_population(total: int) -> dict:
-    """시초 개체수를 9개 유전자형에 분배.
+def init_population(total: int, num_genes: int) -> dict:
+    """시초 개체수를 모든 유전자형에 분배.
     - 균등하게 나눠 떨어지는 몫(base)은 모든 유전자형에 동일하게 배분
     - 나머지(remainder)는 서로 다른 유전자형에 최대 1마리씩만 무작위로 추가 배분
       (remainder는 항상 유전자형 개수보다 작으므로, 특정 유전자형이
        다른 유전자형보다 2마리 이상 더 많이 받는 일은 발생하지 않음)
     """
-    n = len(ALL_GENOTYPES)
+    all_genotypes = generate_all_genotypes(num_genes)
+    n = len(all_genotypes)
     base = total // n
     remainder = total % n
 
-    pop = {g: base for g in ALL_GENOTYPES}
+    pop = {g: base for g in all_genotypes}
     if remainder > 0:
-        lucky_genotypes = random.sample(ALL_GENOTYPES, remainder)
+        lucky_genotypes = random.sample(all_genotypes, remainder)
         for g in lucky_genotypes:
             pop[g] += 1
     return pop
@@ -42,14 +65,17 @@ def gamete(allele_pair: str) -> str:
     return random.choice(allele_pair)
 
 
-def mate(parent1: str, parent2: str) -> str:
-    """두 개체를 교배시켜 자손 유전자형 하나를 생성 (멘델 유전 법칙)"""
-    p1_gene1, p1_gene2 = parent1[0:2], parent1[2:4]
-    p2_gene1, p2_gene2 = parent2[0:2], parent2[2:4]
-
-    child_gene1 = "".join(sorted([gamete(p1_gene1), gamete(p2_gene1)]))
-    child_gene2 = "".join(sorted([gamete(p1_gene2), gamete(p2_gene2)]))
-    return child_gene1 + child_gene2
+def mate(parent1: str, parent2: str, num_genes: int) -> str:
+    """두 개체를 교배시켜 자손 유전자형 하나를 생성 (멘델 유전 법칙).
+    유전자형 문자열은 유전자별로 2글자씩 순서대로 이어져 있다고 가정합니다.
+    """
+    child_parts = []
+    for i in range(num_genes):
+        p1_pair = parent1[i * 2: i * 2 + 2]
+        p2_pair = parent2[i * 2: i * 2 + 2]
+        child_pair = "".join(sorted([gamete(p1_pair), gamete(p2_pair)]))
+        child_parts.append(child_pair)
+    return "".join(child_parts)
 
 
 def apply_death(population: dict, death_rate: float):
