@@ -15,6 +15,7 @@ DEFAULT_MAX_POPULATION = 1000      # 최대 개체수 기본값
 DEFAULT_MUTATION_RATE = 0          # 돌연변이 확률 기본값 (%)
 DEFAULT_OFFSPRING_PER_PAIR = 1      # 1회 교배 출산 개체수 기본값
 DEFAULT_PROSPERITY = 0              # 번성 기본값
+DEFAULT_DECLINE = 0                 # 쇠락 기본값
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
@@ -170,25 +171,47 @@ def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_g
 
 
 def compute_effective_participation_rate(
-    base_rate_percent: float, current_population: int, max_population: int, prosperity_percent: float
+    base_rate_percent: float,
+    current_population: int,
+    max_population: int,
+    prosperity_percent: float,
+    decline_percent: float,
 ) -> float:
-    """번성 옵션을 반영한 실제 교배 참여율(%)을 계산.
-    - 현재 개체수가 최대 개체수의 절반 미만일 때만 번성 효과가 적용됨
-    - 증가 비율 = 번성 * (1 - 현재 개체수 / (최대 개체수 / 2))
-    - 최종 교배 참여율 = 기본 교배 참여율 * (1 + 증가 비율 / 100)
+    """번성/쇠락 옵션을 반영한 실제 교배 참여율(%)을 계산.
+    - 번성: 현재 개체수가 최대 개체수의 절반 미만일 때만 적용.
+      증가 비율 = 번성 * (1 - 현재 개체수 / (최대 개체수 / 2))
+      1차 참여율 = 기본 교배 참여율 * (1 + 증가 비율 / 100)
+    - 쇠락: 현재 개체수가 최대 개체수의 절반 이상일 때만 적용 (절반 미만이면 효과 없음).
+      감소 비율 = (현재 개체수 / 최대 개체수) * (쇠락 / 100)
+      최종 참여율 = 1차 참여율 * (1 - 감소 비율)   (※ %p 감소가 아니라 % 만큼의 상대적 감소)
     """
     if max_population <= 0:
         return base_rate_percent
 
     half_max = max_population / 2
+
+    # 1. 번성 효과 (증가) - 절반 미만일 때만 적용
     if current_population < half_max:
-        ratio = 1 - (current_population / half_max)
-        ratio = max(ratio, 0)
-        boost_percent = prosperity_percent * ratio
+        boost_ratio = 1 - (current_population / half_max)
+        boost_ratio = max(boost_ratio, 0)
+        boost_percent = prosperity_percent * boost_ratio
     else:
         boost_percent = 0
 
-    return base_rate_percent * (1 + boost_percent / 100)
+    rate_after_prosperity = base_rate_percent * (1 + boost_percent / 100)
+
+    # 2. 쇠락 효과 (감소, 상대적 비율 감소) - 절반 이상일 때만 적용
+    if current_population >= half_max:
+        pop_ratio = current_population / max_population
+        pop_ratio = min(max(pop_ratio, 0), 1)
+        decline_ratio = pop_ratio * (decline_percent / 100)
+        decline_ratio = min(decline_ratio, 1)  # 참여율이 음수가 되지 않도록 제한
+    else:
+        decline_ratio = 0
+
+    rate_after_decline = rate_after_prosperity * (1 - decline_ratio)
+
+    return rate_after_decline
 
 
 def next_generation(
@@ -198,16 +221,17 @@ def next_generation(
     offspring_per_pair: int,
     max_population: int,
     prosperity_percent: float,
+    decline_percent: float,
 ):
     """한 세대를 진행시켜 새로운 개체군을 반환.
-    - 번성 옵션에 따라 실제 교배 참여율이 기본값보다 높아질 수 있음
+    - 번성/쇠락 옵션에 따라 실제 교배 참여율이 기본값보다 높거나 낮아질 수 있음
     - 교배 참여율이 100%를 넘으면, 100%씩 완전히 채운 후 남은 비율만큼 추가로 교배를 진행
       (매 라운드 모두 원래(이번 세대 시작 시점) 개체군에서 무작위로 선택)
     - 교배 한 쌍마다 offspring_per_pair 마리의 자손이 태어남
     """
     current_total = sum(population.values())
     effective_rate_percent = compute_effective_participation_rate(
-        base_participation_rate_percent, current_total, max_population, prosperity_percent
+        base_participation_rate_percent, current_total, max_population, prosperity_percent, decline_percent
     )
 
     # 이번 세대 시작 시점의 개체 목록 (모든 라운드에서 공통으로 사용하는 원본 풀)
@@ -378,7 +402,7 @@ with opt_row2_col3:
         help="전체 개체수의 상한선입니다. 교배로 인해 이를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 개체가 죽습니다.",
     )
 
-opt_row3_col1, opt_row3_col2, opt_row3_col3 = st.columns(3)
+opt_row3_col1, opt_row3_col2, opt_row3_col3, opt_row3_col4 = st.columns(4)
 
 with opt_row3_col1:
     mutation_rate_input = st.slider(
@@ -408,6 +432,17 @@ with opt_row3_col3:
         value=DEFAULT_PROSPERITY,
         step=1,
         help="현재 개체수가 최대 개체수의 절반보다 적을 때, 그 차이만큼 교배 참여율을 추가로 끌어올립니다.",
+    )
+
+with opt_row3_col4:
+    decline_input = st.slider(
+        "쇠락",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_DECLINE,
+        step=1,
+        help="현재 개체수가 최대 개체수에 가까울수록 교배 참여율을 상대적으로 감소시킵니다. "
+             "(예: 현재/최대=80%, 쇠락=50이면 참여율이 40% 만큼 상대적으로 줄어듦)",
     )
 
 if st.session_state.started:
@@ -446,6 +481,7 @@ with col2:
             offspring_per_pair_input,
             max_population_input,
             prosperity_input,
+            decline_input,
         )
         num_offspring = sum(offspring_counts.values())
 
@@ -476,7 +512,7 @@ with col2:
         st.session_state.generation += 1
         cap_log = f" / 최대 개체수({max_population_input}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         rate_log = (
-            f"교배 참여율 {reproduction_rate_input}% (번성 적용 후 {effective_rate:.1f}%) 적용"
+            f"교배 참여율 {reproduction_rate_input}% (번성/쇠락 적용 후 {effective_rate:.1f}%) 적용"
             if abs(effective_rate - reproduction_rate_input) > 0.01
             else f"교배 참여율 {reproduction_rate_input}% 적용"
         )
