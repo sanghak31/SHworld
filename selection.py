@@ -51,7 +51,61 @@ EVENTS = {
         "description": "쇠락이 30 증가합니다.",
         "decline_bonus": 30,
     },
+    "기후변화": {
+        "type": "trait_flat_death",
+        "description_template": "{trait} 성질을 지니지 못한 개체는 15%의 사망 확률이 적용됩니다.",
+        "probability": 0.15,
+    },
+    "포식자의 진화": {
+        "type": "trait_weight_death",
+        "description_template": "{trait} 성질을 지니지 못한 개체는 자연 사망될 확률이 200% 증가합니다.",
+        "multiplier": 3.0,  # 200% 증가 = 원래 확률의 3배
+    },
 }
+
+
+def lacks_trait(genotype: str, gene_index: int, trait_type: str) -> bool:
+    """개체(genotype)가 특정 유전자 자리(gene_index)의 특정 성질(trait_type)을 지니지 '못했는지' 판정.
+    - trait_type == 'dominant' (예: 'A' 성질): 대문자를 하나라도 가지면 그 성질을 지님 (AA, Aa) -> 지니지 못한 건 aa뿐
+    - trait_type == 'recessive' (예: 'a' 성질): 동형 소문자(aa)여야만 그 성질을 지님 -> 지니지 못한 건 AA, Aa
+    """
+    letter = GENE_LETTERS[gene_index]
+    pair = genotype[gene_index * 2: gene_index * 2 + 2]
+    if trait_type == "dominant":
+        has_trait = letter in pair
+    else:
+        has_trait = pair == letter.lower() * 2
+    return not has_trait
+
+
+def get_trait_label(gene_index: int, trait_type: str) -> str:
+    letter = GENE_LETTERS[gene_index]
+    return letter if trait_type == "dominant" else letter.lower()
+
+
+def get_event_description(event_entry: dict) -> str:
+    """이벤트 인스턴스의 실제 설명 문구를 생성 (형질 기반 이벤트는 대상 성질을 채워 넣음)"""
+    event_def = EVENTS[event_entry["name"]]
+    if "description_template" in event_def:
+        trait_label = get_trait_label(event_entry["gene_index"], event_entry["trait_type"])
+        return event_def["description_template"].format(trait=trait_label)
+    return event_def["description"]
+
+
+def weighted_sample_without_replacement(items_with_weights: list, k: int) -> list:
+    """가중치가 반영된 비복원 무작위 추출 (Efraimidis-Spirakis 방식).
+    가중치가 클수록 뽑힐 확률이 높아지되, 총 뽑히는 개수(k)는 그대로 유지됨.
+    """
+    if k <= 0:
+        return []
+    keyed = []
+    for item, weight in items_with_weights:
+        weight = max(weight, 1e-9)
+        u = random.random()
+        key = u ** (1.0 / weight)
+        keyed.append((key, item))
+    keyed.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in keyed[:k]]
 
 
 def get_gene_letters(num_genes: int) -> list:
@@ -139,8 +193,11 @@ def apply_max_population_cap(population: dict, max_population: int):
     return new_population, excess
 
 
-def apply_death(population: dict, death_rate: float):
-    """교배 후의 전체 개체군에서 사망 비율만큼 무작위로 개체를 제거"""
+def apply_death(population: dict, death_rate: float, predator_weight_events: list = None):
+    """교배 후의 전체 개체군에서 사망 비율만큼 무작위로 개체를 제거.
+    predator_weight_events가 있으면("포식자의 진화" 이벤트), 해당 성질을 지니지 못한 개체가
+    그만큼 더 높은 가중치로 뽑히도록 하되, 전체 사망 개체수 자체는 그대로 유지함.
+    """
     individuals = []
     for genotype, count in population.items():
         individuals.extend([genotype] * count)
@@ -149,13 +206,42 @@ def apply_death(population: dict, death_rate: float):
     num_death = round(total * death_rate)
     num_death = min(num_death, total)
 
-    dead = random.sample(individuals, num_death)
+    if not predator_weight_events:
+        dead = random.sample(individuals, num_death)
+    else:
+        weights = []
+        for genotype in individuals:
+            weight = 1.0
+            for gene_index, trait_type, multiplier in predator_weight_events:
+                if lacks_trait(genotype, gene_index, trait_type):
+                    weight *= multiplier
+            weights.append(weight)
+        dead = weighted_sample_without_replacement(list(zip(individuals, weights)), num_death)
 
     new_population = dict(population)
     for genotype in dead:
         new_population[genotype] -= 1
 
     return new_population, num_death
+
+
+def apply_trait_specific_death(population: dict, climate_events: list):
+    """'기후변화' 이벤트 적용: 특정 성질을 지니지 못한 개체 각각에 대해
+    독립적으로 확률 판정을 진행해 사망시킴 (전체 사망 비율과 별개로 추가 적용).
+    """
+    new_population = dict(population)
+    total_removed = 0
+
+    for gene_index, trait_type, probability in climate_events:
+        for genotype, count in list(new_population.items()):
+            if count <= 0:
+                continue
+            if lacks_trait(genotype, gene_index, trait_type):
+                deaths = sum(1 for _ in range(count) if random.random() < probability)
+                new_population[genotype] -= deaths
+                total_removed += deaths
+
+    return new_population, total_removed
 
 
 def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_genes: int):
@@ -328,46 +414,73 @@ def compute_allele_frequencies(population: dict, num_genes: int) -> list:
     return frequencies
 
 
-def trigger_event(active_events: list, event_chance_percent: float, max_event_count: int):
+def trigger_event(active_events: list, event_chance_percent: float, max_event_count: int, current_num_genes: int):
     """확률에 따라 새로운 이벤트를 하나 발생시킴 (중복 불가).
     - 이미 최대 개수에 도달했다면 가장 오래된 이벤트를 제거하고 새 이벤트를 추가
     - 모든 이벤트가 이미 활성 상태라면 새로 추가할 이벤트가 없으므로 "no_available" 반환
-    - 확률에 당첨되지 않으면 (None, active_events) 그대로 반환
+    - 확률에 당첨되지 않으면 (원래 active_events, None) 그대로 반환
+    - 형질 기반 이벤트(기후변화/포식자의 진화)는 대상이 될 유전자와 성질(우성/열성)을 이때 무작위로 정함
     """
     if random.random() >= event_chance_percent / 100:
         return list(active_events), None
 
-    available = [name for name in EVENTS if name not in active_events]
+    active_names = [entry["name"] for entry in active_events]
+    available = [name for name in EVENTS if name not in active_names]
     if not available:
         return list(active_events), "no_available"
 
-    new_event = random.choice(available)
+    new_event_name = random.choice(available)
+    event_def = EVENTS[new_event_name]
+    new_entry = {"name": new_event_name}
+
+    if event_def.get("type") in ("trait_flat_death", "trait_weight_death"):
+        new_entry["gene_index"] = random.randrange(current_num_genes)
+        new_entry["trait_type"] = random.choice(["dominant", "recessive"])
+
     new_active_events = list(active_events)
     if len(new_active_events) >= max_event_count:
         new_active_events.pop(0)  # 가장 오래된 이벤트 제거
-    new_active_events.append(new_event)
-    return new_active_events, new_event
+    new_active_events.append(new_entry)
+    return new_active_events, new_entry
 
 
-def compute_event_modifiers(active_events: list):
-    """현재 활성화된 이벤트들의 효과를 모두 합산.
-    반환값: (번성 보너스, 쇠락 보너스, 최대개체수 배율, 사망률 %p 가산, 사망률 배율)
+def compute_event_effects(active_events: list):
+    """현재 활성화된 이벤트들의 효과를 종류별로 합산.
+    반환값: (번성 보너스, 쇠락 보너스, 최대개체수 배율, 사망률 %p 가산, 사망률 배율,
+             기후변화 목록[(gene_index, trait_type, 확률)], 포식자의 진화 목록[(gene_index, trait_type, 배율)])
     """
     prosperity_bonus = 0
     decline_bonus = 0
     max_population_mult = 1.0
     death_rate_point_add = 0
     death_rate_mult = 1.0
+    climate_events = []
+    predator_weight_events = []
 
-    for name in active_events:
-        effect = EVENTS[name]
-        prosperity_bonus += effect.get("prosperity_bonus", 0)
-        decline_bonus += effect.get("decline_bonus", 0)
-        max_population_mult *= effect.get("max_population_mult", 1.0)
-        death_rate_point_add += effect.get("death_rate_point_add", 0)
-        death_rate_mult *= effect.get("death_rate_mult", 1.0)
+    for entry in active_events:
+        event_def = EVENTS[entry["name"]]
+        event_type = event_def.get("type")
 
-    return prosperity_bonus, decline_bonus, max_population_mult, death_rate_point_add, death_rate_mult
+        if event_type == "trait_flat_death":
+            climate_events.append((entry["gene_index"], entry["trait_type"], event_def["probability"]))
+        elif event_type == "trait_weight_death":
+            predator_weight_events.append((entry["gene_index"], entry["trait_type"], event_def["multiplier"]))
+        else:
+            prosperity_bonus += event_def.get("prosperity_bonus", 0)
+            decline_bonus += event_def.get("decline_bonus", 0)
+            max_population_mult *= event_def.get("max_population_mult", 1.0)
+            death_rate_point_add += event_def.get("death_rate_point_add", 0)
+            death_rate_mult *= event_def.get("death_rate_mult", 1.0)
+
+    return (
+        prosperity_bonus,
+        decline_bonus,
+        max_population_mult,
+        death_rate_point_add,
+        death_rate_mult,
+        climate_events,
+        predator_weight_events,
+    )
 
 
 # ------------------------------------------------------------
@@ -459,7 +572,7 @@ with opt_row2_col1:
 
 with opt_row2_col2:
     death_rate_input = st.slider(
-        "사망 비율 (%)",
+        "사망률 (%)",
         min_value=0,
         max_value=100,
         value=DEFAULT_DEATH_RATE,
@@ -542,7 +655,7 @@ with opt_row4_col2:
     )
 
 if st.session_state.started:
-    st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 교배 참여율·사망 비율·번성 등은 다음 세대부터 즉시 적용됩니다.")
+    st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 교배 참여율·사망률·번성 등은 다음 세대부터 즉시 적용됩니다.")
 
 st.divider()
 
@@ -572,18 +685,25 @@ with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
         # 0. 이벤트 발생 판정
         st.session_state.active_events, triggered_event = trigger_event(
-            st.session_state.active_events, event_chance_input, event_max_count_input
+            st.session_state.active_events, event_chance_input, event_max_count_input, st.session_state.num_genes
         )
         event_log = ""
         if triggered_event == "no_available":
             event_log = " / 이벤트 발생을 시도했으나 모든 이벤트가 이미 활성화되어 있어 무산"
         elif triggered_event:
-            event_log = f" / 새로운 이벤트 발생: {triggered_event} ({EVENTS[triggered_event]['description']})"
+            event_log = f" / 새로운 이벤트 발생: {triggered_event['name']} ({get_event_description(triggered_event)})"
 
         # 활성 이벤트들의 효과 합산 (옵션값 자체는 그대로 두고, 계산에만 반영)
-        prosperity_bonus, decline_bonus, max_pop_mult, death_point_add, death_mult = compute_event_modifiers(
-            st.session_state.active_events
-        )
+        (
+            prosperity_bonus,
+            decline_bonus,
+            max_pop_mult,
+            death_point_add,
+            death_mult,
+            climate_events,
+            predator_weight_events,
+        ) = compute_event_effects(st.session_state.active_events)
+
         effective_prosperity = prosperity_input + prosperity_bonus
         effective_decline = decline_input + decline_bonus
         effective_max_population = max(1, round(max_population_input * max_pop_mult))
@@ -619,9 +739,14 @@ with col2:
             mated_population, effective_max_population
         )
 
-        # 4. 사망 비율(이벤트 반영)만큼 무작위 제거
-        final_population, num_death = apply_death(
-            capped_population, effective_death_rate_percent / 100
+        # 4. 사망률(이벤트 반영, 포식자의 진화로 인한 가중치 포함)만큼 무작위 제거
+        after_death_population, num_death = apply_death(
+            capped_population, effective_death_rate_percent / 100, predator_weight_events
+        )
+
+        # 5. 기후변화 이벤트: 특정 성질을 지니지 못한 개체에 추가 사망 판정
+        final_population, num_climate_death = apply_trait_specific_death(
+            after_death_population, climate_events
         )
 
         st.session_state.population = final_population
@@ -633,14 +758,15 @@ with col2:
             else f"교배 참여율 {reproduction_rate_input}% 적용"
         )
         death_log = (
-            f"사망 비율 {death_rate_input}% (이벤트 적용 후 {effective_death_rate_percent:.1f}%) 적용"
+            f"사망률 {death_rate_input}% (이벤트 적용 후 {effective_death_rate_percent:.1f}%) 적용"
             if abs(effective_death_rate_percent - death_rate_input) > 0.01
-            else f"사망 비율 {death_rate_input}% 적용"
+            else f"사망률 {death_rate_input}% 적용"
         )
+        climate_log = f" / 기후변화로 추가 {num_climate_death}마리 사망" if num_climate_death > 0 else ""
         st.session_state.logs.append(
             f"[{st.session_state.generation}세대] {rate_log} - "
             f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log}{event_log} / "
-            f"{death_log} - {num_death}마리 사망"
+            f"{death_log} - {num_death}마리 사망{climate_log}"
         )
 
 with col3:
@@ -655,8 +781,8 @@ if st.session_state.logs:
 
 # 현재 활성화된 이벤트 표시 (사라지기 전까지 계속 표시됨)
 if st.session_state.started and st.session_state.active_events:
-    for event_name in st.session_state.active_events:
-        st.warning(f"⚡ **{event_name}** : {EVENTS[event_name]['description']}")
+    for event_entry in st.session_state.active_events:
+        st.warning(f"⚡ **{event_entry['name']}** : {get_event_description(event_entry)}")
 
 # 시뮬레이션 결과 표시 (시작 전에는 표시하지 않음)
 if st.session_state.started:
