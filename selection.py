@@ -13,6 +13,8 @@ DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
 DEFAULT_DISPLAY_COUNT = 10         # 표시할 유전자형 수 기본값
 DEFAULT_MAX_POPULATION = 1000      # 최대 개체수 기본값
 DEFAULT_MUTATION_RATE = 0          # 돌연변이 확률 기본값 (%)
+DEFAULT_OFFSPRING_PER_PAIR = 1      # 1회 교배 출산 개체수 기본값
+DEFAULT_PROSPERITY = 0              # 번성 기본값
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
@@ -167,38 +169,84 @@ def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_g
     return new_population, new_num_genes, mutant_genotype
 
 
-def next_generation(population: dict, reproduction_rate: float, num_genes: int):
-    """한 세대를 진행시켜 새로운 개체군을 반환"""
-    # 1. 개체 목록 전개 (유전자형별 개체수만큼 리스트에 펼침)
+def compute_effective_participation_rate(
+    base_rate_percent: float, current_population: int, max_population: int, prosperity_percent: float
+) -> float:
+    """번성 옵션을 반영한 실제 교배 참여율(%)을 계산.
+    - 현재 개체수가 최대 개체수의 절반 미만일 때만 번성 효과가 적용됨
+    - 증가 비율 = 번성 * (1 - 현재 개체수 / (최대 개체수 / 2))
+    - 최종 교배 참여율 = 기본 교배 참여율 * (1 + 증가 비율 / 100)
+    """
+    if max_population <= 0:
+        return base_rate_percent
+
+    half_max = max_population / 2
+    if current_population < half_max:
+        ratio = 1 - (current_population / half_max)
+        ratio = max(ratio, 0)
+        boost_percent = prosperity_percent * ratio
+    else:
+        boost_percent = 0
+
+    return base_rate_percent * (1 + boost_percent / 100)
+
+
+def next_generation(
+    population: dict,
+    base_participation_rate_percent: float,
+    num_genes: int,
+    offspring_per_pair: int,
+    max_population: int,
+    prosperity_percent: float,
+):
+    """한 세대를 진행시켜 새로운 개체군을 반환.
+    - 번성 옵션에 따라 실제 교배 참여율이 기본값보다 높아질 수 있음
+    - 교배 참여율이 100%를 넘으면, 100%씩 완전히 채운 후 남은 비율만큼 추가로 교배를 진행
+      (매 라운드 모두 원래(이번 세대 시작 시점) 개체군에서 무작위로 선택)
+    - 교배 한 쌍마다 offspring_per_pair 마리의 자손이 태어남
+    """
+    current_total = sum(population.values())
+    effective_rate_percent = compute_effective_participation_rate(
+        base_participation_rate_percent, current_total, max_population, prosperity_percent
+    )
+
+    # 이번 세대 시작 시점의 개체 목록 (모든 라운드에서 공통으로 사용하는 원본 풀)
     individuals = []
     for genotype, count in population.items():
         individuals.extend([genotype] * count)
-
     total = len(individuals)
-    num_select = round(total * reproduction_rate)
-    num_select = min(num_select, total)
 
-    # 2. 자손 생성율만큼 무작위로 개체 지목
-    selected = random.sample(individuals, num_select)
-
-    # 3. 홀수면 하나를 무작위로 제외
-    if len(selected) % 2 == 1:
-        selected.pop(random.randrange(len(selected)))
-
-    # 4. 무작위로 두 마리씩 짝지어 순차적으로 교배
-    random.shuffle(selected)
     offspring_counts = {}
-    for i in range(0, len(selected), 2):
-        parent1, parent2 = selected[i], selected[i + 1]
-        child = mate(parent1, parent2, num_genes)
-        offspring_counts[child] = offspring_counts.get(child, 0) + 1
+    total_mated = 0
+    remaining_percent = effective_rate_percent
 
-    # 5. 기존 개체군에 자손을 더함 (부모 개체는 그대로 유지)
+    while remaining_percent > 1e-9 and total > 0:
+        round_percent = min(remaining_percent, 100)
+        num_select = round(total * (round_percent / 100))
+        num_select = min(num_select, total)
+
+        if num_select >= 2:
+            selected = random.sample(individuals, num_select)
+            if len(selected) % 2 == 1:
+                selected.pop(random.randrange(len(selected)))
+            random.shuffle(selected)
+
+            for i in range(0, len(selected), 2):
+                parent1, parent2 = selected[i], selected[i + 1]
+                for _ in range(offspring_per_pair):
+                    child = mate(parent1, parent2, num_genes)
+                    offspring_counts[child] = offspring_counts.get(child, 0) + 1
+
+            total_mated += len(selected)
+
+        remaining_percent -= 100
+
+    # 기존 개체군에 자손을 더함 (부모 개체는 그대로 유지)
     new_population = dict(population)
     for genotype, count in offspring_counts.items():
         new_population[genotype] = new_population.get(genotype, 0) + count
 
-    return new_population, offspring_counts, len(selected)
+    return new_population, offspring_counts, total_mated, effective_rate_percent
 
 
 def compute_allele_frequencies(population: dict, num_genes: int) -> list:
@@ -275,25 +323,35 @@ with opt_row1_col3:
     # 실제 진행 중인 유전자 수를 기준으로 최대 표시 개수를 계산
     effective_num_genes = st.session_state.num_genes if st.session_state.started else num_genes_input
     max_display = 3 ** effective_num_genes
+
+    show_all_genotypes_input = st.toggle(
+        "모든 유전자형 표시하기",
+        value=False,
+        help="켜면 상황에 관계없이 '표시할 유전자형의 수'가 항상 최댓값으로 고정됩니다.",
+    )
+
     display_count_input = st.number_input(
         "표시할 유전자형의 수",
         min_value=1,
         max_value=max_display,
         value=min(DEFAULT_DISPLAY_COUNT, max_display),
         step=1,
+        disabled=show_all_genotypes_input,
         help="개체수 비율이 높은 순서대로 상위 몇 개의 유전자형을 표시할지 정합니다.",
     )
+    if show_all_genotypes_input:
+        display_count_input = max_display
 
 opt_row2_col1, opt_row2_col2, opt_row2_col3 = st.columns(3)
 
 with opt_row2_col1:
     reproduction_rate_input = st.slider(
-        "자손 생성율 (%)",
+        "교배 참여율 (%)",
         min_value=0,
         max_value=100,
         value=DEFAULT_REPRODUCTION_RATE,
         step=1,
-        help="매 세대마다 전체 개체 중 교배에 참여할 개체의 비율입니다.",
+        help="매 세대마다 전체 개체 중 교배에 참여할 개체의 기본 비율입니다. (번성 옵션에 따라 실제 참여율은 더 높아질 수 있습니다)",
     )
 
 with opt_row2_col2:
@@ -316,7 +374,7 @@ with opt_row2_col3:
         help="전체 개체수의 상한선입니다. 교배로 인해 이를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 개체가 죽습니다.",
     )
 
-opt_row3_col1, _, _ = st.columns(3)
+opt_row3_col1, opt_row3_col2, opt_row3_col3 = st.columns(3)
 
 with opt_row3_col1:
     mutation_rate_input = st.slider(
@@ -328,8 +386,28 @@ with opt_row3_col1:
         help="'다음 세대' 진행 시, 이 확률로 새로 태어난 개체 중 하나가 새로운 대립유전자를 갖고 등장합니다.",
     )
 
+with opt_row3_col2:
+    offspring_per_pair_input = st.slider(
+        "1회 교배 출산 개체수",
+        min_value=1,
+        max_value=10,
+        value=DEFAULT_OFFSPRING_PER_PAIR,
+        step=1,
+        help="교배 한 쌍이 성사될 때마다 태어나는 자손의 수입니다.",
+    )
+
+with opt_row3_col3:
+    prosperity_input = st.slider(
+        "번성",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_PROSPERITY,
+        step=1,
+        help="현재 개체수가 최대 개체수의 절반보다 적을 때, 그 차이만큼 교배 참여율을 추가로 끌어올립니다.",
+    )
+
 if st.session_state.started:
-    st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 자손 생성율·사망 비율은 다음 세대부터 즉시 적용됩니다.")
+    st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 교배 참여율·사망 비율·번성 등은 다음 세대부터 즉시 적용됩니다.")
 
 st.divider()
 
@@ -356,9 +434,14 @@ with col1:
 
 with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
-        # 1. 교배 진행 (자손 생성)
-        mated_population, offspring_counts, num_mated = next_generation(
-            st.session_state.population, reproduction_rate_input / 100, st.session_state.num_genes
+        # 1. 교배 진행 (번성 옵션 반영, 자손 생성)
+        mated_population, offspring_counts, num_mated, effective_rate = next_generation(
+            st.session_state.population,
+            reproduction_rate_input,
+            st.session_state.num_genes,
+            offspring_per_pair_input,
+            max_population_input,
+            prosperity_input,
         )
         num_offspring = sum(offspring_counts.values())
 
@@ -388,8 +471,13 @@ with col2:
         st.session_state.population = final_population
         st.session_state.generation += 1
         cap_log = f" / 최대 개체수({max_population_input}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
+        rate_log = (
+            f"교배 참여율 {reproduction_rate_input}% (번성 적용 후 {effective_rate:.1f}%) 적용"
+            if abs(effective_rate - reproduction_rate_input) > 0.01
+            else f"교배 참여율 {reproduction_rate_input}% 적용"
+        )
         st.session_state.logs.append(
-            f"[{st.session_state.generation}세대] 자손 생성율 {reproduction_rate_input}% 적용 - "
+            f"[{st.session_state.generation}세대] {rate_log} - "
             f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log} / "
             f"사망 비율 {death_rate_input}% 적용 - {num_death}마리 사망"
         )
