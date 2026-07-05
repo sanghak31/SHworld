@@ -9,6 +9,7 @@ st.set_page_config(page_title="자연선택 개체군 시뮬레이터", layout="
 DEFAULT_INITIAL_POPULATION = 90   # 시초 개체수 기본값
 DEFAULT_REPRODUCTION_RATE = 50    # 자손 생성율 기본값 (%)
 DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
+DEFAULT_ERROR = 0                 # 오차 기본값 (%)
 DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
 DEFAULT_DISPLAY_COUNT = 10         # 표시할 유전자형 수 기본값
 DEFAULT_MAX_POPULATION = 1000      # 최대 개체수 기본값
@@ -299,6 +300,18 @@ def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_g
     return new_population, new_num_genes, mutant_genotype
 
 
+def apply_error_margin(base_value_percent: float, error_percent: float) -> float:
+    """기준값에 오차 범위를 적용해 무작위 값을 반환.
+    오차 범위 = 기준값 * (오차 / 100), 그 범위 내에서 균등 분포로 무작위 선택.
+    (예: 기준값 10%, 오차 50% -> 5~15% 사이에서 무작위 결정)
+    """
+    if error_percent <= 0:
+        return base_value_percent
+    margin = base_value_percent * (error_percent / 100)
+    value = random.uniform(base_value_percent - margin, base_value_percent + margin)
+    return max(value, 0)
+
+
 def compute_effective_participation_rate(
     base_rate_percent: float,
     current_population: int,
@@ -576,7 +589,7 @@ with opt_row1_col3:
     if show_all_genotypes_input:
         display_count_input = max_display
 
-opt_row2_col1, opt_row2_col2, opt_row2_col3 = st.columns(3)
+opt_row2_col1, opt_row2_col2, opt_row2_col3, opt_row2_col4 = st.columns(4)
 
 with opt_row2_col1:
     reproduction_rate_input = st.slider(
@@ -599,6 +612,17 @@ with opt_row2_col2:
     )
 
 with opt_row2_col3:
+    error_margin_input = st.slider(
+        "오차 (%)",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_ERROR,
+        step=1,
+        help="교배 참여율과 사망률에 매 세대 적용되는 오차 범위입니다. "
+             "(예: 참여율 10%, 오차 50% -> 실제 적용값이 5~15% 사이에서 무작위로 결정된 후 번성/쇠락 등이 적용됨)",
+    )
+
+with opt_row2_col4:
     max_population_input = st.number_input(
         "최대 개체수",
         min_value=1,
@@ -725,12 +749,17 @@ with col2:
         effective_prosperity = prosperity_input + prosperity_bonus
         effective_decline = decline_input + decline_bonus
         effective_max_population = max(1, round(max_population_input * max_pop_mult))
-        effective_death_rate_percent = min(max((death_rate_input + death_point_add) * death_mult, 0), 100)
 
-        # 1. 교배 진행 (번성/쇠락/이벤트 반영, 자손 생성)
+        # 오차 적용: 교배 참여율과 사망률의 기준값을 각각 무작위로 흔든 뒤, 이후 효과들을 적용
+        randomized_participation_rate = apply_error_margin(reproduction_rate_input, error_margin_input)
+        randomized_death_rate = apply_error_margin(death_rate_input, error_margin_input)
+
+        effective_death_rate_percent = min(max((randomized_death_rate + death_point_add) * death_mult, 0), 100)
+
+        # 1. 교배 진행 (오차/번성/쇠락/이벤트 반영, 자손 생성)
         mated_population, offspring_counts, num_mated, effective_rate = next_generation(
             st.session_state.population,
-            reproduction_rate_input,
+            randomized_participation_rate,
             st.session_state.num_genes,
             offspring_per_pair_input,
             effective_max_population,
@@ -771,12 +800,14 @@ with col2:
         st.session_state.generation += 1
         cap_log = f" / 최대 개체수({effective_max_population}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         rate_log = (
-            f"교배 참여율 {reproduction_rate_input}% (번성/쇠락 적용 후 {effective_rate:.1f}%) 적용"
+            f"교배 참여율 {reproduction_rate_input}% (오차 적용 {randomized_participation_rate:.1f}% → "
+            f"번성/쇠락 적용 후 {effective_rate:.1f}%) 적용"
             if abs(effective_rate - reproduction_rate_input) > 0.01
             else f"교배 참여율 {reproduction_rate_input}% 적용"
         )
         death_log = (
-            f"사망률 {death_rate_input}% (이벤트 적용 후 {effective_death_rate_percent:.1f}%) 적용"
+            f"사망률 {death_rate_input}% (오차 적용 {randomized_death_rate:.1f}% → "
+            f"이벤트 적용 후 {effective_death_rate_percent:.1f}%) 적용"
             if abs(effective_death_rate_percent - death_rate_input) > 0.01
             else f"사망률 {death_rate_input}% 적용"
         )
