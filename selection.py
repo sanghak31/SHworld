@@ -16,10 +16,42 @@ DEFAULT_MUTATION_RATE = 0          # 돌연변이 확률 기본값 (%)
 DEFAULT_OFFSPRING_PER_PAIR = 1      # 1회 교배 출산 개체수 기본값
 DEFAULT_PROSPERITY = 0              # 번성 기본값
 DEFAULT_DECLINE = 0                 # 쇠락 기본값
+DEFAULT_EVENT_CHANCE = 0            # 이벤트 발생 확률 기본값 (%)
+DEFAULT_EVENT_MAX_COUNT = 3         # 이벤트 최대 개수 기본값
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
 MIN_GENES = 1
+
+# 이벤트 정의: 각 이벤트는 옵션값 자체를 바꾸지 않고, 계산 시점에만 보너스/배율로 적용됨
+# - prosperity_bonus, decline_bonus: 해당 옵션에 그대로 더해지는 값
+# - max_population_mult: 최대 개체수에 곱해지는 배율
+# - death_rate_point_add: 사망률에 %p로 그대로 더해지는 값
+# - death_rate_mult: 사망률에 곱해지는 배율 (상대적 % 증가)
+EVENTS = {
+    "풍족한 먹이": {
+        "description": "번성이 30 증가하고, 최대 개체수가 50% 증가합니다.",
+        "prosperity_bonus": 30,
+        "max_population_mult": 1.5,
+    },
+    "화산 폭발": {
+        "description": "사망률이 20%p 증가합니다.",
+        "death_rate_point_add": 20,
+    },
+    "먹이 부족": {
+        "description": "쇠락이 30 증가하고, 사망률이 20% 증가합니다.",
+        "decline_bonus": 30,
+        "death_rate_mult": 1.2,
+    },
+    "포식자 증가": {
+        "description": "사망률이 50% 증가합니다.",
+        "death_rate_mult": 1.5,
+    },
+    "먹이 경쟁 심화": {
+        "description": "쇠락이 30 증가합니다.",
+        "decline_bonus": 30,
+    },
+}
 
 
 def get_gene_letters(num_genes: int) -> list:
@@ -296,6 +328,48 @@ def compute_allele_frequencies(population: dict, num_genes: int) -> list:
     return frequencies
 
 
+def trigger_event(active_events: list, event_chance_percent: float, max_event_count: int):
+    """확률에 따라 새로운 이벤트를 하나 발생시킴 (중복 불가).
+    - 이미 최대 개수에 도달했다면 가장 오래된 이벤트를 제거하고 새 이벤트를 추가
+    - 모든 이벤트가 이미 활성 상태라면 새로 추가할 이벤트가 없으므로 "no_available" 반환
+    - 확률에 당첨되지 않으면 (None, active_events) 그대로 반환
+    """
+    if random.random() >= event_chance_percent / 100:
+        return list(active_events), None
+
+    available = [name for name in EVENTS if name not in active_events]
+    if not available:
+        return list(active_events), "no_available"
+
+    new_event = random.choice(available)
+    new_active_events = list(active_events)
+    if len(new_active_events) >= max_event_count:
+        new_active_events.pop(0)  # 가장 오래된 이벤트 제거
+    new_active_events.append(new_event)
+    return new_active_events, new_event
+
+
+def compute_event_modifiers(active_events: list):
+    """현재 활성화된 이벤트들의 효과를 모두 합산.
+    반환값: (번성 보너스, 쇠락 보너스, 최대개체수 배율, 사망률 %p 가산, 사망률 배율)
+    """
+    prosperity_bonus = 0
+    decline_bonus = 0
+    max_population_mult = 1.0
+    death_rate_point_add = 0
+    death_rate_mult = 1.0
+
+    for name in active_events:
+        effect = EVENTS[name]
+        prosperity_bonus += effect.get("prosperity_bonus", 0)
+        decline_bonus += effect.get("decline_bonus", 0)
+        max_population_mult *= effect.get("max_population_mult", 1.0)
+        death_rate_point_add += effect.get("death_rate_point_add", 0)
+        death_rate_mult *= effect.get("death_rate_mult", 1.0)
+
+    return prosperity_bonus, decline_bonus, max_population_mult, death_rate_point_add, death_rate_mult
+
+
 # ------------------------------------------------------------
 # 세션 상태 초기화
 # ------------------------------------------------------------
@@ -305,6 +379,7 @@ if "started" not in st.session_state:
     st.session_state.population = {}
     st.session_state.logs = []
     st.session_state.num_genes = DEFAULT_NUM_GENES
+    st.session_state.active_events = []
 
 
 # ------------------------------------------------------------
@@ -441,8 +516,29 @@ with opt_row3_col4:
         max_value=100,
         value=DEFAULT_DECLINE,
         step=1,
-        help="현재 개체수가 최대 개체수에 가까울수록 교배 참여율을 상대적으로 감소시킵니다. "
-             "(예: 현재/최대=80%, 쇠락=50이면 참여율이 40% 만큼 상대적으로 줄어듦)",
+        help="현재 개체수가 최대 개체수의 절반 이상일 때, 최대 개체수 대비 현재 개체수 비율만큼 교배 참여율을 상대적으로 감소시킵니다.",
+    )
+
+opt_row4_col1, opt_row4_col2 = st.columns(2)
+
+with opt_row4_col1:
+    event_chance_input = st.slider(
+        "이벤트 발생 확률 (%)",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_EVENT_CHANCE,
+        step=1,
+        help="'다음 세대' 진행 시, 이 확률로 새로운 이벤트가 하나 발생합니다. 이벤트는 사라지기 전까지 효과가 계속 적용됩니다.",
+    )
+
+with opt_row4_col2:
+    event_max_count_input = st.slider(
+        "이벤트 최대 개수",
+        min_value=1,
+        max_value=5,
+        value=DEFAULT_EVENT_MAX_COUNT,
+        step=1,
+        help="동시에 활성화될 수 있는 이벤트의 최대 개수입니다. 초과 시 가장 오래된 이벤트가 사라집니다.",
     )
 
 if st.session_state.started:
@@ -463,6 +559,7 @@ with col1:
         st.session_state.population = init_population(initial_population_input, num_genes_input)
         st.session_state.generation = 1
         st.session_state.started = True
+        st.session_state.active_events = []
         used_letters_log = ", ".join(
             f"{l}/{l.lower()}" for l in get_gene_letters(num_genes_input)
         )
@@ -473,15 +570,34 @@ with col1:
 
 with col2:
     if st.button("다음 세대", disabled=not st.session_state.started):
-        # 1. 교배 진행 (번성 옵션 반영, 자손 생성)
+        # 0. 이벤트 발생 판정
+        st.session_state.active_events, triggered_event = trigger_event(
+            st.session_state.active_events, event_chance_input, event_max_count_input
+        )
+        event_log = ""
+        if triggered_event == "no_available":
+            event_log = " / 이벤트 발생을 시도했으나 모든 이벤트가 이미 활성화되어 있어 무산"
+        elif triggered_event:
+            event_log = f" / 새로운 이벤트 발생: {triggered_event} ({EVENTS[triggered_event]['description']})"
+
+        # 활성 이벤트들의 효과 합산 (옵션값 자체는 그대로 두고, 계산에만 반영)
+        prosperity_bonus, decline_bonus, max_pop_mult, death_point_add, death_mult = compute_event_modifiers(
+            st.session_state.active_events
+        )
+        effective_prosperity = prosperity_input + prosperity_bonus
+        effective_decline = decline_input + decline_bonus
+        effective_max_population = max(1, round(max_population_input * max_pop_mult))
+        effective_death_rate_percent = min(max((death_rate_input + death_point_add) * death_mult, 0), 100)
+
+        # 1. 교배 진행 (번성/쇠락/이벤트 반영, 자손 생성)
         mated_population, offspring_counts, num_mated, effective_rate = next_generation(
             st.session_state.population,
             reproduction_rate_input,
             st.session_state.num_genes,
             offspring_per_pair_input,
-            max_population_input,
-            prosperity_input,
-            decline_input,
+            effective_max_population,
+            effective_prosperity,
+            effective_decline,
         )
         num_offspring = sum(offspring_counts.values())
 
@@ -498,28 +614,33 @@ with col2:
             elif st.session_state.num_genes >= MAX_GENES:
                 mutation_log = " / 돌연변이 시도됐으나 최대 대립유전자 수에 도달하여 무산"
 
-        # 3. 최대 개체수를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
+        # 3. 최대 개체수(이벤트 반영)를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
         capped_population, num_capped = apply_max_population_cap(
-            mated_population, max_population_input
+            mated_population, effective_max_population
         )
 
-        # 4. 사망 비율만큼 무작위 제거
+        # 4. 사망 비율(이벤트 반영)만큼 무작위 제거
         final_population, num_death = apply_death(
-            capped_population, death_rate_input / 100
+            capped_population, effective_death_rate_percent / 100
         )
 
         st.session_state.population = final_population
         st.session_state.generation += 1
-        cap_log = f" / 최대 개체수({max_population_input}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
+        cap_log = f" / 최대 개체수({effective_max_population}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         rate_log = (
             f"교배 참여율 {reproduction_rate_input}% (번성/쇠락 적용 후 {effective_rate:.1f}%) 적용"
             if abs(effective_rate - reproduction_rate_input) > 0.01
             else f"교배 참여율 {reproduction_rate_input}% 적용"
         )
+        death_log = (
+            f"사망 비율 {death_rate_input}% (이벤트 적용 후 {effective_death_rate_percent:.1f}%) 적용"
+            if abs(effective_death_rate_percent - death_rate_input) > 0.01
+            else f"사망 비율 {death_rate_input}% 적용"
+        )
         st.session_state.logs.append(
             f"[{st.session_state.generation}세대] {rate_log} - "
-            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log} / "
-            f"사망 비율 {death_rate_input}% 적용 - {num_death}마리 사망"
+            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log}{event_log} / "
+            f"{death_log} - {num_death}마리 사망"
         )
 
 with col3:
@@ -531,6 +652,11 @@ st.write("")
 # 가장 최근 로그를 버튼과 결과 표시 사이에 표시
 if st.session_state.logs:
     st.info(st.session_state.logs[-1])
+
+# 현재 활성화된 이벤트 표시 (사라지기 전까지 계속 표시됨)
+if st.session_state.started and st.session_state.active_events:
+    for event_name in st.session_state.active_events:
+        st.warning(f"⚡ **{event_name}** : {EVENTS[event_name]['description']}")
 
 # 시뮬레이션 결과 표시 (시작 전에는 표시하지 않음)
 if st.session_state.started:
