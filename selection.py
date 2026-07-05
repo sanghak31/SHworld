@@ -201,6 +201,29 @@ def next_generation(population: dict, reproduction_rate: float, num_genes: int):
     return new_population, offspring_counts, len(selected)
 
 
+def compute_allele_frequencies(population: dict, num_genes: int) -> list:
+    """유전자별로 전체 대립유전자 중 우성(대문자)/열성(소문자) 비율을 계산.
+    반환값: [(글자, 우성비율%, 열성비율%), ...]
+    """
+    letters = get_gene_letters(num_genes)
+    total_individuals = sum(population.values())
+    total_alleles = total_individuals * 2  # 개체당 대립유전자 2개(이배체)
+
+    frequencies = []
+    for i, letter in enumerate(letters):
+        upper_count = 0
+        lower_count = 0
+        for genotype, count in population.items():
+            pair = genotype[i * 2: i * 2 + 2]
+            upper_count += pair.count(letter) * count
+            lower_count += pair.count(letter.lower()) * count
+
+        upper_pct = (upper_count / total_alleles * 100) if total_alleles > 0 else 0
+        lower_pct = (lower_count / total_alleles * 100) if total_alleles > 0 else 0
+        frequencies.append((letter, upper_pct, lower_pct))
+    return frequencies
+
+
 # ------------------------------------------------------------
 # 세션 상태 초기화
 # ------------------------------------------------------------
@@ -248,7 +271,10 @@ with opt_row1_col2:
     )
 
 with opt_row1_col3:
-    max_display = 3 ** num_genes_input
+    # 시작 전에는 옵션에서 설정한 유전자 수를, 시작 후에는(돌연변이로 늘어날 수 있으므로)
+    # 실제 진행 중인 유전자 수를 기준으로 최대 표시 개수를 계산
+    effective_num_genes = st.session_state.num_genes if st.session_state.started else num_genes_input
+    max_display = 3 ** effective_num_genes
     display_count_input = st.number_input(
         "표시할 유전자형의 수",
         min_value=1,
@@ -390,6 +416,12 @@ if st.session_state.started:
                 row[j].markdown(f"**{genotype}** : {count} / {ratio:.1f}%")
 
     st.caption(f"전체 개체수: {total}마리")
+
+    allele_frequencies = compute_allele_frequencies(
+        st.session_state.population, st.session_state.num_genes
+    )
+    for letter, upper_pct, lower_pct in allele_frequencies:
+        st.caption(f"{letter}/{letter.lower()} 대립유전자 비율 : {letter} {upper_pct:.1f}% / {letter.lower()} {lower_pct:.1f}%")
 else:
     st.write("아직 시뮬레이션이 시작되지 않았습니다. '시뮬레이터 시작하기' 버튼을 눌러주세요.")
 
