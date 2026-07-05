@@ -12,6 +12,7 @@ DEFAULT_DEATH_RATE = 0            # 사망 비율 기본값 (%)
 DEFAULT_NUM_GENES = 2             # 대립유전자 수 기본값
 DEFAULT_DISPLAY_COUNT = 10         # 표시할 유전자형 수 기본값
 DEFAULT_MAX_POPULATION = 1000      # 최대 개체수 기본값
+DEFAULT_MUTATION_RATE = 0          # 돌연변이 확률 기본값 (%)
 
 GENE_LETTERS = "ABCDEFGHIJ"        # 대립유전자 표시 순서 (최대 10개)
 MAX_GENES = 10
@@ -120,6 +121,50 @@ def apply_death(population: dict, death_rate: float):
         new_population[genotype] -= 1
 
     return new_population, num_death
+
+
+def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_genes: int):
+    """확률에 당첨된 경우, 교배로 새로 태어난 개체 중 하나를 골라 새로운 대립유전자를 부여.
+    - 새로운 대립유전자는 GENE_LETTERS 순서상 다음 글자를 사용 (예: A,B 사용 중이면 C)
+    - 선택된 돌연변이 개체는 새 유전자에 대해 이형접합(대문자+소문자, 예: Cc)을 가짐
+    - 그 외 기존/신생 개체는 모두 새 유전자에 대해 동형접합 소문자(예: cc)를 가짐
+    - 이미 최대 유전자 수(MAX_GENES)에 도달했거나, 이번 세대에 태어난 개체가 없으면
+      돌연변이가 발생하지 않음 (population은 그대로, mutant_genotype은 None으로 반환)
+    """
+    if current_num_genes >= MAX_GENES:
+        return mated_population, current_num_genes, None
+
+    offspring_individuals = []
+    for genotype, count in offspring_counts.items():
+        offspring_individuals.extend([genotype] * count)
+
+    if not offspring_individuals:
+        return mated_population, current_num_genes, None
+
+    mutant_base_genotype = random.choice(offspring_individuals)
+
+    new_letter = GENE_LETTERS[current_num_genes]
+    normal_suffix = new_letter.lower() * 2                              # 예: "cc"
+    mutant_suffix = "".join(sorted([new_letter, new_letter.lower()]))    # 예: "Cc"
+
+    # 1. 돌연변이가 될 개체 하나를 기존 개체수에서 제외
+    working_population = dict(mated_population)
+    working_population[mutant_base_genotype] -= 1
+
+    # 2. 나머지 모든 개체(기존 + 신생)는 새 유전자 자리에 동형접합 소문자쌍을 부여
+    new_population = {}
+    for genotype, count in working_population.items():
+        if count <= 0:
+            continue
+        extended_genotype = genotype + normal_suffix
+        new_population[extended_genotype] = new_population.get(extended_genotype, 0) + count
+
+    # 3. 돌연변이 개체를 이형접합(대문자+소문자)으로 추가
+    mutant_genotype = mutant_base_genotype + mutant_suffix
+    new_population[mutant_genotype] = new_population.get(mutant_genotype, 0) + 1
+
+    new_num_genes = current_num_genes + 1
+    return new_population, new_num_genes, mutant_genotype
 
 
 def next_generation(population: dict, reproduction_rate: float, num_genes: int):
@@ -245,6 +290,18 @@ with opt_row2_col3:
         help="전체 개체수의 상한선입니다. 교배로 인해 이를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 개체가 죽습니다.",
     )
 
+opt_row3_col1, _, _ = st.columns(3)
+
+with opt_row3_col1:
+    mutation_rate_input = st.slider(
+        "돌연변이 확률 (%)",
+        min_value=0,
+        max_value=100,
+        value=DEFAULT_MUTATION_RATE,
+        step=1,
+        help="'다음 세대' 진행 시, 이 확률로 새로 태어난 개체 중 하나가 새로운 대립유전자를 갖고 등장합니다.",
+    )
+
 if st.session_state.started:
     st.caption("※ 대립유전자의 수와 시초 개체수는 시작 전에만 변경할 수 있고, 자손 생성율·사망 비율은 다음 세대부터 즉시 적용됩니다.")
 
@@ -279,12 +336,25 @@ with col2:
         )
         num_offspring = sum(offspring_counts.values())
 
-        # 2. 최대 개체수를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
+        # 2. 돌연변이 확률 판정
+        mutation_log = ""
+        if random.random() < mutation_rate_input / 100:
+            mutated_population, new_num_genes, mutant_genotype = apply_mutation(
+                mated_population, offspring_counts, st.session_state.num_genes
+            )
+            if mutant_genotype is not None:
+                mated_population = mutated_population
+                st.session_state.num_genes = new_num_genes
+                mutation_log = f" / 돌연변이 발생! {mutant_genotype} 개체 등장"
+            elif st.session_state.num_genes >= MAX_GENES:
+                mutation_log = " / 돌연변이 시도됐으나 최대 대립유전자 수에 도달하여 무산"
+
+        # 3. 최대 개체수를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
         capped_population, num_capped = apply_max_population_cap(
             mated_population, max_population_input
         )
 
-        # 3. 사망 비율만큼 무작위 제거
+        # 4. 사망 비율만큼 무작위 제거
         final_population, num_death = apply_death(
             capped_population, death_rate_input / 100
         )
@@ -294,7 +364,7 @@ with col2:
         cap_log = f" / 최대 개체수({max_population_input}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         st.session_state.logs.append(
             f"[{st.session_state.generation}세대] 자손 생성율 {reproduction_rate_input}% 적용 - "
-            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{cap_log} / "
+            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log} / "
             f"사망 비율 {death_rate_input}% 적용 - {num_death}마리 사망"
         )
 
