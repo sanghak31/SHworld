@@ -24,44 +24,55 @@ MAX_GENES = 10
 MIN_GENES = 1
 
 # 이벤트 정의: 각 이벤트는 옵션값 자체를 바꾸지 않고, 계산 시점에만 보너스/배율로 적용됨
-# - prosperity_bonus, decline_bonus: 해당 옵션에 그대로 더해지는 값
-# - max_population_mult: 최대 개체수에 곱해지는 배율
-# - death_rate_point_add: 사망률에 %p로 그대로 더해지는 값
-# - death_rate_mult: 사망률에 곱해지는 배율 (상대적 % 증가)
+# - "rolls": 이벤트 발생 시 이 범위(포함) 내에서 정수 하나를 무작위로 뽑아 고정하고,
+#            사라지기 전까지 그 값이 계속 유지됨
+#   · prosperity_bonus: 번성에 그대로 더해지는 값
+#   · decline_bonus: 쇠락에 그대로 더해지는 값
+#   · max_population_pct: 최대 개체수 증가율(%) -> 배율 = 1 + 값/100
+#   · death_point_add: 사망률에 %p로 그대로 더해지는 값
+#   · death_pct: 사망률 상대적 증가율(%) -> 배율 = 1 + 값/100
+#   · climate_probability_pct: 기후변화의 개별 사망 확률(%)
+#   · predator_pct: 포식자의 진화로 인한 사망 가중치 증가율(%) -> 배율 = 1 + 값/100
 EVENTS = {
     "풍족한 먹이": {
-        "description": "번성이 30 증가하고, 최대 개체수가 50% 증가합니다.",
-        "prosperity_bonus": 30,
-        "max_population_mult": 1.5,
+        "rolls": {"prosperity_bonus": (10, 50), "max_population_pct": (50, 100)},
+        "description_template": "번성이 {prosperity_bonus} 증가하고, 최대 개체수가 {max_population_pct}% 증가합니다.",
     },
-    "화산 폭발": {
-        "description": "사망률이 20%p 증가합니다.",
-        "death_rate_point_add": 20,
+    "자연재해": {
+        "rolls": {"death_point_add": (10, 25)},
+        "description_template": "사망률이 {death_point_add}%p 증가합니다.",
     },
     "먹이 부족": {
-        "description": "쇠락이 30 증가하고, 사망률이 20% 증가합니다.",
-        "decline_bonus": 30,
-        "death_rate_mult": 1.2,
+        "rolls": {"decline_bonus": (20, 40), "death_pct": (10, 50)},
+        "description_template": "쇠락이 {decline_bonus} 증가하고, 사망률이 {death_pct}% 증가합니다.",
     },
     "포식자 증가": {
-        "description": "사망률이 50% 증가합니다.",
-        "death_rate_mult": 1.5,
+        "rolls": {"death_pct": (30, 70)},
+        "description_template": "사망률이 {death_pct}% 증가합니다.",
     },
     "먹이 경쟁 심화": {
-        "description": "쇠락이 30 증가합니다.",
-        "decline_bonus": 30,
+        "rolls": {"decline_bonus": (20, 40)},
+        "description_template": "쇠락이 {decline_bonus} 증가합니다.",
     },
     "기후변화": {
         "type": "trait_flat_death",
-        "description_template": "{trait} 성질을 지니지 못한 개체는 15%의 사망 확률이 적용됩니다.",
-        "probability": 0.15,
+        "rolls": {"climate_probability_pct": (10, 30)},
+        "description_template": "{trait} 성질을 지니지 못한 개체는 {climate_probability_pct}%의 사망 확률이 적용됩니다.",
     },
     "포식자의 진화": {
         "type": "trait_weight_death",
-        "description_template": "{trait} 성질을 지니지 못한 개체는 자연 사망될 확률이 200% 증가합니다.",
-        "multiplier": 3.0,  # 200% 증가 = 원래 확률의 3배
+        "rolls": {"predator_pct": (100, 400)},
+        "description_template": "{trait} 성질을 지니지 못한 개체는 자연 사망될 확률이 {predator_pct}% 증가합니다.",
     },
 }
+
+
+def roll_event_values(event_def: dict) -> dict:
+    """이벤트 정의의 rolls 범위 내에서 값을 무작위로 뽑아 딕셔너리로 반환 (발생 시 한 번만 호출)"""
+    rolled = {}
+    for key, (low, high) in event_def.get("rolls", {}).items():
+        rolled[key] = random.randint(low, high)
+    return rolled
 
 
 def lacks_trait(genotype: str, gene_index: int, trait_type: str) -> bool:
@@ -84,12 +95,12 @@ def get_trait_label(gene_index: int, trait_type: str) -> str:
 
 
 def get_event_description(event_entry: dict) -> str:
-    """이벤트 인스턴스의 실제 설명 문구를 생성 (형질 기반 이벤트는 대상 성질을 채워 넣음)"""
+    """이벤트 인스턴스의 실제 설명 문구를 생성 (난수로 뽑힌 값과, 형질 기반 이벤트는 대상 성질을 채워 넣음)"""
     event_def = EVENTS[event_entry["name"]]
-    if "description_template" in event_def:
-        trait_label = get_trait_label(event_entry["gene_index"], event_entry["trait_type"])
-        return event_def["description_template"].format(trait=trait_label)
-    return event_def["description"]
+    format_values = dict(event_entry.get("rolled", {}))
+    if "gene_index" in event_entry:
+        format_values["trait"] = get_trait_label(event_entry["gene_index"], event_entry["trait_type"])
+    return event_def["description_template"].format(**format_values)
 
 
 def weighted_sample_without_replacement(items_with_weights: list, k: int) -> list:
@@ -431,7 +442,7 @@ def trigger_event(active_events: list, event_chance_percent: float, max_event_co
 
     new_event_name = random.choice(available)
     event_def = EVENTS[new_event_name]
-    new_entry = {"name": new_event_name}
+    new_entry = {"name": new_event_name, "rolled": roll_event_values(event_def)}
 
     if event_def.get("type") in ("trait_flat_death", "trait_weight_death"):
         new_entry["gene_index"] = random.randrange(current_num_genes)
@@ -445,7 +456,7 @@ def trigger_event(active_events: list, event_chance_percent: float, max_event_co
 
 
 def compute_event_effects(active_events: list):
-    """현재 활성화된 이벤트들의 효과를 종류별로 합산.
+    """현재 활성화된 이벤트들의 효과를 종류별로 합산 (각 이벤트에 저장된 rolled 값을 사용).
     반환값: (번성 보너스, 쇠락 보너스, 최대개체수 배율, 사망률 %p 가산, 사망률 배율,
              기후변화 목록[(gene_index, trait_type, 확률)], 포식자의 진화 목록[(gene_index, trait_type, 배율)])
     """
@@ -458,19 +469,26 @@ def compute_event_effects(active_events: list):
     predator_weight_events = []
 
     for entry in active_events:
-        event_def = EVENTS[entry["name"]]
-        event_type = event_def.get("type")
+        rolled = entry.get("rolled", {})
 
-        if event_type == "trait_flat_death":
-            climate_events.append((entry["gene_index"], entry["trait_type"], event_def["probability"]))
-        elif event_type == "trait_weight_death":
-            predator_weight_events.append((entry["gene_index"], entry["trait_type"], event_def["multiplier"]))
-        else:
-            prosperity_bonus += event_def.get("prosperity_bonus", 0)
-            decline_bonus += event_def.get("decline_bonus", 0)
-            max_population_mult *= event_def.get("max_population_mult", 1.0)
-            death_rate_point_add += event_def.get("death_rate_point_add", 0)
-            death_rate_mult *= event_def.get("death_rate_mult", 1.0)
+        if "prosperity_bonus" in rolled:
+            prosperity_bonus += rolled["prosperity_bonus"]
+        if "decline_bonus" in rolled:
+            decline_bonus += rolled["decline_bonus"]
+        if "max_population_pct" in rolled:
+            max_population_mult *= (1 + rolled["max_population_pct"] / 100)
+        if "death_point_add" in rolled:
+            death_rate_point_add += rolled["death_point_add"]
+        if "death_pct" in rolled:
+            death_rate_mult *= (1 + rolled["death_pct"] / 100)
+        if "climate_probability_pct" in rolled:
+            climate_events.append(
+                (entry["gene_index"], entry["trait_type"], rolled["climate_probability_pct"] / 100)
+            )
+        if "predator_pct" in rolled:
+            predator_weight_events.append(
+                (entry["gene_index"], entry["trait_type"], 1 + rolled["predator_pct"] / 100)
+            )
 
     return (
         prosperity_bonus,
