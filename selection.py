@@ -400,6 +400,10 @@ with col3:
 
 st.write("")
 
+# 가장 최근 로그를 버튼과 결과 표시 사이에 표시
+if st.session_state.logs:
+    st.info(st.session_state.logs[-1])
+
 # 시뮬레이션 결과 표시 (시작 전에는 표시하지 않음)
 if st.session_state.started:
     total = sum(st.session_state.population.values())
@@ -421,7 +425,9 @@ if st.session_state.started:
         st.session_state.population, st.session_state.num_genes
     )
     for letter, upper_pct, lower_pct in allele_frequencies:
-        st.caption(f"{letter}/{letter.lower()} 대립유전자 비율 : {letter} {upper_pct:.1f}% / {letter.lower()} {lower_pct:.1f}%")
+        upper_str = "멸종" if upper_pct == 0 else f"{upper_pct:.1f}%"
+        lower_str = "멸종" if lower_pct == 0 else f"{lower_pct:.1f}%"
+        st.caption(f"{letter}/{letter.lower()} 대립유전자 비율 : {letter} {upper_str} / {letter.lower()} {lower_str}")
 else:
     st.write("아직 시뮬레이션이 시작되지 않았습니다. '시뮬레이터 시작하기' 버튼을 눌러주세요.")
 
