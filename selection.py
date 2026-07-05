@@ -324,11 +324,8 @@ with opt_row1_col3:
     effective_num_genes = st.session_state.num_genes if st.session_state.started else num_genes_input
     max_display = 3 ** effective_num_genes
 
-    show_all_genotypes_input = st.toggle(
-        "모든 유전자형 표시하기",
-        value=False,
-        help="켜면 상황에 관계없이 '표시할 유전자형의 수'가 항상 최댓값으로 고정됩니다.",
-    )
+    # 토글 위젯이 생성되기 전이므로, 이전 렌더링에서의 토글 상태를 세션 상태에서 미리 확인
+    show_all_genotypes_prev = st.session_state.get("show_all_genotypes_toggle", False)
 
     display_count_input = st.number_input(
         "표시할 유전자형의 수",
@@ -336,8 +333,15 @@ with opt_row1_col3:
         max_value=max_display,
         value=min(DEFAULT_DISPLAY_COUNT, max_display),
         step=1,
-        disabled=show_all_genotypes_input,
+        disabled=show_all_genotypes_prev,
         help="개체수 비율이 높은 순서대로 상위 몇 개의 유전자형을 표시할지 정합니다.",
+    )
+
+    show_all_genotypes_input = st.toggle(
+        "모든 유전자형 표시하기",
+        value=False,
+        key="show_all_genotypes_toggle",
+        help="켜면 상황에 관계없이 '표시할 유전자형의 수'가 항상 최댓값으로 고정됩니다.",
     )
     if show_all_genotypes_input:
         display_count_input = max_display
