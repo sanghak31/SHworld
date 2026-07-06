@@ -65,6 +65,15 @@ EVENTS = {
         "rolls": {"predator_pct": (100, 400)},
         "description_template": "{trait} 성질을 지니지 못한 개체는 자연 사망될 확률이 {predator_pct}% 증가합니다.",
     },
+    "포식자 감소": {
+        "rolls": {"death_pct_decrease": (10, 50)},
+        "description_template": "사망률이 {death_pct_decrease}% 감소합니다.",
+    },
+    "위장": {
+        "type": "camouflage",
+        "rolls": {"survival_pct": (100, 400)},
+        "description_template": "{trait} 대립유전자를 지닌 개체의 생존 확률이 {survival_pct}% 증가합니다.",
+    },
 }
 
 
@@ -88,6 +97,16 @@ def lacks_trait(genotype: str, gene_index: int, trait_type: str) -> bool:
     else:
         has_trait = pair == letter.lower() * 2
     return not has_trait
+
+
+def has_specific_allele(genotype: str, gene_index: int, trait_type: str) -> bool:
+    """개체(genotype)가 특정 유전자 자리(gene_index)에서 특정 대립유전자(trait_type이 가리키는
+    대문자 또는 소문자 한 글자)를 하나라도 지니고 있는지 판정. (표현형이 아니라 대립유전자 자체의 보유 여부)
+    """
+    letter = GENE_LETTERS[gene_index]
+    pair = genotype[gene_index * 2: gene_index * 2 + 2]
+    allele_char = letter if trait_type == "dominant" else letter.lower()
+    return allele_char in pair
 
 
 def get_trait_label(gene_index: int, trait_type: str) -> str:
@@ -182,9 +201,41 @@ def mate(parent1: str, parent2: str, num_genes: int) -> str:
     return "".join(child_parts)
 
 
-def apply_max_population_cap(population: dict, max_population: int):
-    """전체 개체수가 최대 개체수를 초과하면, 초과한 수만큼 무작위로 개체를 제거.
-    (새로 태어난 개체와 기존 개체 구분 없이 전체 개체 중에서 무작위로 제거)
+def compute_death_weight(
+    genotype: str, predator_weight_events: list = None, camouflage_events: list = None
+) -> float:
+    """개체 하나가 '죽는 쪽으로 뽑힐' 상대적 가중치를 계산.
+    - 포식자의 진화: 대상 성질을 지니지 못한 개체는 가중치가 곱해져 죽을 확률이 높아짐
+    - 위장: 대상 대립유전자를 지닌 개체는 가중치가 나눠져 죽을 확률이 낮아짐(생존 확률 증가)
+    두 효과 모두 사망률로 인한 자연사망과 최대 개체수 초과로 인한 사망 둘 다에 동일하게 적용됨.
+    """
+    weight = 1.0
+    for gene_index, trait_type, multiplier in (predator_weight_events or []):
+        if lacks_trait(genotype, gene_index, trait_type):
+            weight *= multiplier
+    for gene_index, trait_type, survival_multiplier in (camouflage_events or []):
+        if has_specific_allele(genotype, gene_index, trait_type):
+            weight /= survival_multiplier
+    return weight
+
+
+def weighted_death_selection(
+    individuals: list, num_death: int, predator_weight_events: list = None, camouflage_events: list = None
+) -> list:
+    """포식자의 진화/위장 효과가 있으면 가중 비복원 추출로, 없으면 균등 무작위 추출로 사망 대상을 선택."""
+    if not predator_weight_events and not camouflage_events:
+        return random.sample(individuals, num_death)
+
+    weights = [compute_death_weight(g, predator_weight_events, camouflage_events) for g in individuals]
+    return weighted_sample_without_replacement(list(zip(individuals, weights)), num_death)
+
+
+def apply_max_population_cap(
+    population: dict, max_population: int, predator_weight_events: list = None, camouflage_events: list = None
+):
+    """전체 개체수가 최대 개체수를 초과하면, 초과한 수만큼 개체를 제거.
+    (새로 태어난 개체와 기존 개체 구분 없이 전체 개체 중에서 선택하며,
+     포식자의 진화/위장 효과가 있으면 그 가중치가 반영됨)
     """
     total = sum(population.values())
     if total <= max_population:
@@ -196,7 +247,7 @@ def apply_max_population_cap(population: dict, max_population: int):
     for genotype, count in population.items():
         individuals.extend([genotype] * count)
 
-    removed = random.sample(individuals, excess)
+    removed = weighted_death_selection(individuals, excess, predator_weight_events, camouflage_events)
 
     new_population = dict(population)
     for genotype in removed:
@@ -205,10 +256,9 @@ def apply_max_population_cap(population: dict, max_population: int):
     return new_population, excess
 
 
-def apply_death(population: dict, death_rate: float, predator_weight_events: list = None):
-    """교배 후의 전체 개체군에서 사망 비율만큼 무작위로 개체를 제거.
-    predator_weight_events가 있으면("포식자의 진화" 이벤트), 해당 성질을 지니지 못한 개체가
-    그만큼 더 높은 가중치로 뽑히도록 하되, 전체 사망 개체수 자체는 그대로 유지함.
+def apply_death(population: dict, death_rate: float, predator_weight_events: list = None, camouflage_events: list = None):
+    """교배 후의 전체 개체군에서 사망률만큼 개체를 제거.
+    포식자의 진화/위장 효과가 있으면 그 가중치가 반영되며, 전체 사망 개체수 자체는 그대로 유지됨.
     """
     individuals = []
     for genotype, count in population.items():
@@ -218,17 +268,7 @@ def apply_death(population: dict, death_rate: float, predator_weight_events: lis
     num_death = round(total * death_rate)
     num_death = min(num_death, total)
 
-    if not predator_weight_events:
-        dead = random.sample(individuals, num_death)
-    else:
-        weights = []
-        for genotype in individuals:
-            weight = 1.0
-            for gene_index, trait_type, multiplier in predator_weight_events:
-                if lacks_trait(genotype, gene_index, trait_type):
-                    weight *= multiplier
-            weights.append(weight)
-        dead = weighted_sample_without_replacement(list(zip(individuals, weights)), num_death)
+    dead = weighted_death_selection(individuals, num_death, predator_weight_events, camouflage_events)
 
     new_population = dict(population)
     for genotype in dead:
@@ -303,7 +343,6 @@ def apply_mutation(mated_population: dict, offspring_counts: dict, current_num_g
 def apply_error_margin(base_value_percent: float, error_percent: float) -> float:
     """기준값에 오차 범위를 적용해 무작위 값을 반환.
     오차 범위 = 기준값 * (오차 / 100), 그 범위 내에서 균등 분포로 무작위 선택.
-    (예: 기준값 10%, 오차 50% -> 5~15% 사이에서 무작위 결정)
     """
     if error_percent <= 0:
         return base_value_percent
@@ -457,7 +496,7 @@ def trigger_event(active_events: list, event_chance_percent: float, max_event_co
     event_def = EVENTS[new_event_name]
     new_entry = {"name": new_event_name, "rolled": roll_event_values(event_def)}
 
-    if event_def.get("type") in ("trait_flat_death", "trait_weight_death"):
+    if event_def.get("type") in ("trait_flat_death", "trait_weight_death", "camouflage"):
         new_entry["gene_index"] = random.randrange(current_num_genes)
         new_entry["trait_type"] = random.choice(["dominant", "recessive"])
 
@@ -471,7 +510,9 @@ def trigger_event(active_events: list, event_chance_percent: float, max_event_co
 def compute_event_effects(active_events: list):
     """현재 활성화된 이벤트들의 효과를 종류별로 합산 (각 이벤트에 저장된 rolled 값을 사용).
     반환값: (번성 보너스, 쇠락 보너스, 최대개체수 배율, 사망률 %p 가산, 사망률 배율,
-             기후변화 목록[(gene_index, trait_type, 확률)], 포식자의 진화 목록[(gene_index, trait_type, 배율)])
+             기후변화 목록[(gene_index, trait_type, 확률)],
+             포식자의 진화 목록[(gene_index, trait_type, 배율)],
+             위장 목록[(gene_index, trait_type, 생존배율)])
     """
     prosperity_bonus = 0
     decline_bonus = 0
@@ -480,6 +521,7 @@ def compute_event_effects(active_events: list):
     death_rate_mult = 1.0
     climate_events = []
     predator_weight_events = []
+    camouflage_events = []
 
     for entry in active_events:
         rolled = entry.get("rolled", {})
@@ -494,6 +536,8 @@ def compute_event_effects(active_events: list):
             death_rate_point_add += rolled["death_point_add"]
         if "death_pct" in rolled:
             death_rate_mult *= (1 + rolled["death_pct"] / 100)
+        if "death_pct_decrease" in rolled:
+            death_rate_mult *= (1 - rolled["death_pct_decrease"] / 100)
         if "climate_probability_pct" in rolled:
             climate_events.append(
                 (entry["gene_index"], entry["trait_type"], rolled["climate_probability_pct"] / 100)
@@ -501,6 +545,10 @@ def compute_event_effects(active_events: list):
         if "predator_pct" in rolled:
             predator_weight_events.append(
                 (entry["gene_index"], entry["trait_type"], 1 + rolled["predator_pct"] / 100)
+            )
+        if "survival_pct" in rolled:
+            camouflage_events.append(
+                (entry["gene_index"], entry["trait_type"], 1 + rolled["survival_pct"] / 100)
             )
 
     return (
@@ -511,6 +559,7 @@ def compute_event_effects(active_events: list):
         death_rate_mult,
         climate_events,
         predator_weight_events,
+        camouflage_events,
     )
 
 
@@ -598,7 +647,7 @@ with opt_row2_col1:
         max_value=100,
         value=DEFAULT_REPRODUCTION_RATE,
         step=1,
-        help="매 세대마다 전체 개체 중 교배에 참여할 개체의 기본 비율입니다. (번성 옵션에 따라 실제 참여율은 더 높아질 수 있습니다)",
+        help="매 세대마다 전체 개체 중 교배에 참여할 개체의 기본 비율입니다.",
     )
 
 with opt_row2_col2:
@@ -618,8 +667,7 @@ with opt_row2_col3:
         max_value=100,
         value=DEFAULT_ERROR,
         step=1,
-        help="교배 참여율과 사망률에 매 세대 적용되는 오차 범위입니다. "
-             "(예: 참여율 10%, 오차 50% -> 실제 적용값이 5~15% 사이에서 무작위로 결정된 후 번성/쇠락 등이 적용됨)",
+        help="교배 참여율과 사망률에 매 세대 적용되는 오차 범위입니다.",
     )
 
 with opt_row2_col4:
@@ -731,9 +779,9 @@ with col2:
         )
         event_log = ""
         if triggered_event == "no_available":
-            event_log = " / 이벤트 발생을 시도했으나 모든 이벤트가 이미 활성화되어 있어 무산"
+            event_log = "이벤트 발생을 시도했으나 모든 이벤트가 이미 활성화되어 있어 무산"
         elif triggered_event:
-            event_log = f" / 새로운 이벤트 발생: {triggered_event['name']} ({get_event_description(triggered_event)})"
+            event_log = f"새로운 이벤트 발생: {triggered_event['name']} ({get_event_description(triggered_event)})"
 
         # 활성 이벤트들의 효과 합산 (옵션값 자체는 그대로 두고, 계산에만 반영)
         (
@@ -744,6 +792,7 @@ with col2:
             death_mult,
             climate_events,
             predator_weight_events,
+            camouflage_events,
         ) = compute_event_effects(st.session_state.active_events)
 
         effective_prosperity = prosperity_input + prosperity_bonus
@@ -777,18 +826,20 @@ with col2:
             if mutant_genotype is not None:
                 mated_population = mutated_population
                 st.session_state.num_genes = new_num_genes
-                mutation_log = f" / 돌연변이 발생! {mutant_genotype} 개체 등장"
+                mutation_log = f"돌연변이 발생! {mutant_genotype} 개체 등장"
             elif st.session_state.num_genes >= MAX_GENES:
-                mutation_log = " / 돌연변이 시도됐으나 최대 대립유전자 수에 도달하여 무산"
+                mutation_log = "돌연변이 시도됐으나 최대 대립유전자 수에 도달하여 무산"
 
-        # 3. 최대 개체수(이벤트 반영)를 초과하면, 초과한 수만큼 전체 개체 중 무작위로 제거
+        # 3. 최대 개체수(이벤트 반영)를 초과하면, 초과한 수만큼 개체를 제거
+        #    (포식자의 진화/위장 효과가 있으면 그 가중치가 여기에도 반영됨)
         capped_population, num_capped = apply_max_population_cap(
-            mated_population, effective_max_population
+            mated_population, effective_max_population, predator_weight_events, camouflage_events
         )
 
-        # 4. 사망률(이벤트 반영, 포식자의 진화로 인한 가중치 포함)만큼 무작위 제거
+        # 4. 사망률(이벤트 반영)만큼 개체를 제거
+        #    (포식자의 진화/위장 효과가 있으면 그 가중치가 여기에도 반영됨)
         after_death_population, num_death = apply_death(
-            capped_population, effective_death_rate_percent / 100, predator_weight_events
+            capped_population, effective_death_rate_percent / 100, predator_weight_events, camouflage_events
         )
 
         # 5. 기후변화 이벤트: 특정 성질을 지니지 못한 개체에 추가 사망 판정
@@ -798,7 +849,8 @@ with col2:
 
         st.session_state.population = final_population
         st.session_state.generation += 1
-        cap_log = f" / 최대 개체수({effective_max_population}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
+
+        cap_log = f"최대 개체수({effective_max_population}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         rate_log = (
             f"교배 참여율 {reproduction_rate_input}% (오차 적용 {randomized_participation_rate:.1f}% → "
             f"번성/쇠락 적용 후 {effective_rate:.1f}%) 적용"
@@ -811,12 +863,21 @@ with col2:
             if abs(effective_death_rate_percent - death_rate_input) > 0.01
             else f"사망률 {death_rate_input}% 적용"
         )
-        climate_log = f" / 기후변화로 추가 {num_climate_death}마리 사망" if num_climate_death > 0 else ""
-        st.session_state.logs.append(
-            f"[{st.session_state.generation}세대] {rate_log} - "
-            f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생{mutation_log}{cap_log}{event_log} / "
-            f"{death_log} - {num_death}마리 사망{climate_log}"
-        )
+        climate_log = f"기후변화로 추가 {num_climate_death}마리 사망" if num_climate_death > 0 else ""
+
+        log_lines = [f"[{st.session_state.generation}세대] {rate_log}"]
+        log_lines.append(f"{num_mated}마리가 교배하여 {num_offspring}마리 탄생")
+        if mutation_log:
+            log_lines.append(mutation_log)
+        if cap_log:
+            log_lines.append(cap_log)
+        if event_log:
+            log_lines.append(event_log)
+        log_lines.append(f"{death_log} - {num_death}마리 사망")
+        if climate_log:
+            log_lines.append(climate_log)
+
+        st.session_state.logs.append("  \n".join(log_lines))
 
 with col3:
     if st.session_state.started:
