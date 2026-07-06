@@ -233,7 +233,7 @@ def weighted_death_selection(
 def apply_max_population_cap(
     population: dict, max_population: int, predator_weight_events: list = None, camouflage_events: list = None
 ):
-    """전체 개체수가 최대 개체수를 초과하면, 초과한 수만큼 개체를 제거.
+    """전체 개체수가 최대 개체수를 초과하면, 초과한 수의 '절반'만큼만 개체를 제거해 서서히 맞춰감.
     (새로 태어난 개체와 기존 개체 구분 없이 전체 개체 중에서 선택하며,
      포식자의 진화/위장 효과가 있으면 그 가중치가 반영됨)
     """
@@ -242,18 +242,20 @@ def apply_max_population_cap(
         return population, 0
 
     excess = total - max_population
+    num_to_remove = round(excess / 2)
+    num_to_remove = min(num_to_remove, total)
 
     individuals = []
     for genotype, count in population.items():
         individuals.extend([genotype] * count)
 
-    removed = weighted_death_selection(individuals, excess, predator_weight_events, camouflage_events)
+    removed = weighted_death_selection(individuals, num_to_remove, predator_weight_events, camouflage_events)
 
     new_population = dict(population)
     for genotype in removed:
         new_population[genotype] -= 1
 
-    return new_population, excess
+    return new_population, num_to_remove
 
 
 def apply_death(population: dict, death_rate: float, predator_weight_events: list = None, camouflage_events: list = None):
