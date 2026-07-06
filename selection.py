@@ -1,5 +1,6 @@
 import streamlit as st
 import random
+import pandas as pd
 
 st.set_page_config(page_title="자연선택 개체군 시뮬레이터", layout="centered")
 
@@ -479,6 +480,18 @@ def compute_allele_frequencies(population: dict, num_genes: int) -> list:
     return frequencies
 
 
+def record_history_snapshot():
+    """현재 세대의 전체 개체수와 유전자별 우성 대립유전자 비율을 히스토리에 기록 (그래프용)"""
+    total_population = sum(st.session_state.population.values())
+    entry = {"generation": st.session_state.generation, "population": total_population}
+
+    frequencies = compute_allele_frequencies(st.session_state.population, st.session_state.num_genes)
+    for letter, upper_pct, lower_pct in frequencies:
+        entry[letter] = upper_pct  # 우성 대립유전자 비율(%) 기준으로 기록 (열성 비율은 100 - 값)
+
+    st.session_state.history.append(entry)
+
+
 def trigger_event(active_events: list, event_chance_percent: float, max_event_count: int, current_num_genes: int):
     """확률에 따라 새로운 이벤트를 하나 발생시킴 (중복 불가).
     - 이미 최대 개수에 도달했다면 가장 오래된 이벤트를 제거하고 새 이벤트를 추가
@@ -575,6 +588,7 @@ if "started" not in st.session_state:
     st.session_state.logs = []
     st.session_state.num_genes = DEFAULT_NUM_GENES
     st.session_state.active_events = []
+    st.session_state.history = []
 
 
 # ------------------------------------------------------------
