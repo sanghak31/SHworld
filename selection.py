@@ -504,9 +504,11 @@ def ensure_event_queue_filled():
 
 
 def get_event_preview_description(event_name: str) -> str:
-    """아직 발생하지 않은 예고 이벤트의 설명(구체적인 수치 대신 범위로 표시)"""
+    """아직 발생하지 않은 예고 이벤트의 설명(구체적인 수치 대신 범위로 표시).
+    범위 표시에 쓰이는 '~'는 마크다운에서 취소선(~~)으로 잘못 해석될 수 있어 이스케이프 처리함.
+    """
     event_def = EVENTS[event_name]
-    format_values = {key: f"{low}~{high}" for key, (low, high) in event_def.get("rolls", {}).items()}
+    format_values = {key: f"{low}\\~{high}" for key, (low, high) in event_def.get("rolls", {}).items()}
     if "{trait}" in event_def["description_template"]:
         format_values["trait"] = "(무작위 대립유전자)"
     return event_def["description_template"].format(**format_values)
