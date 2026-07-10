@@ -1,10 +1,36 @@
 import time
+import glob
 
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import numpy as np
 import streamlit as st
 
 st.set_page_config(page_title="신경 자극 전달 시뮬레이션", page_icon="🧠", layout="wide")
+
+
+# ------------------------------------------------------------
+# 한글 폰트 설정 (Streamlit Cloud 등 리눅스 서버에서 한글 깨짐 방지)
+# packages.txt에 'fonts-nanum'을 추가해 나눔고딕이 설치되어 있어야 합니다.
+# ------------------------------------------------------------
+@st.cache_resource
+def set_korean_font():
+    candidates = glob.glob("/usr/share/fonts/**/Nanum*.ttf", recursive=True)
+    if candidates:
+        font_path = candidates[0]
+        fm.fontManager.addfont(font_path)
+        font_name = fm.FontProperties(fname=font_path).get_name()
+        plt.rcParams["font.family"] = font_name
+    else:
+        # 나눔고딕이 없을 경우 시스템에 있는 다른 한글 지원 폰트를 탐색
+        for name in ["Malgun Gothic", "AppleGothic", "NanumGothic", "Noto Sans CJK KR"]:
+            if any(name.lower() in f.name.lower() for f in fm.fontManager.ttflist):
+                plt.rcParams["font.family"] = name
+                break
+    plt.rcParams["axes.unicode_minus"] = False  # 마이너스 기호 깨짐 방지
+
+
+set_korean_font()
 
 st.title("🧠 신경 자극 전달 시뮬레이션")
 st.caption("뉴런을 따라 자극(활동전위)이 전달되는 과정을 시뮬레이션합니다.")
