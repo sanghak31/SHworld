@@ -140,16 +140,35 @@ st.divider()
 st.header("📈 그래프")
 
 
-def action_potential(t, onset, rest=-70.0, peak=40.0, ahp=-85.0,
-                      rise=0.3, fall=0.4, ahp_width=0.9):
-    """onset 시점을 기준으로 한 단순화된 활동전위 파형 (mV).
-    실제 Hodgkin-Huxley 방정식이 아닌, 표준 스파이크 모양을 본뜬 근사 모델입니다."""
+def action_potential(t, onset, t_rise=1.0, t_fall=1.5, t_recover=2.5):
+    """onset 시점을 기준으로 한 활동전위 파형 (mV). 교과서/모의고사에 나오는
+    막전위 변화 그래프와 같은 형태로, onset 이전에는 반드시 휴지 전위를
+    그대로 유지하고(음수 구간 변화 없음), onset 이후에만
+    탈분극 → 재분극(과분극) → 재분극 완료 순서로 변화합니다."""
+    rest = -70.0
+    peak = 40.0
+    trough = -85.0
+
     rel = t - onset
-    depol_peak = rise
-    spike = (peak - rest) * np.exp(-0.5 * ((rel - depol_peak) / (rise * 0.6)) ** 2)
-    ahp_time = depol_peak + fall + ahp_width * 0.35
-    dip = (rest - ahp) * np.exp(-0.5 * ((rel - ahp_time) / (ahp_width * 0.5)) ** 2)
-    return rest + spike - dip
+    v = np.full_like(t, rest, dtype=float)
+
+    # 1) 탈분극: 휴지 전위 -> 최고점 (부드러운 상승)
+    m1 = (rel >= 0) & (rel < t_rise)
+    frac1 = rel[m1] / t_rise
+    v[m1] = rest + (peak - rest) * np.sin(frac1 * np.pi / 2)
+
+    # 2) 재분극(+ 과분극): 최고점 -> 최저점
+    m2 = (rel >= t_rise) & (rel < t_rise + t_fall)
+    frac2 = (rel[m2] - t_rise) / t_fall
+    v[m2] = peak + (trough - peak) * (1 - np.cos(frac2 * np.pi)) / 2
+
+    # 3) 재분극 완료: 최저점 -> 휴지 전위로 복귀
+    m3 = (rel >= t_rise + t_fall) & (rel < t_rise + t_fall + t_recover)
+    frac3 = (rel[m3] - (t_rise + t_fall)) / t_recover
+    v[m3] = trough + (rest - trough) * (1 - np.cos(frac3 * np.pi)) / 2
+
+    # 그 외 구간(onset 이전 및 회복 완료 이후)은 휴지 전위(-70 mV) 그대로 유지
+    return v
 
 
 if st.session_state.result_time is not None:
@@ -176,8 +195,9 @@ if st.session_state.result_time is not None:
     st.caption("시작점(파란색)에서 발생한 활동전위가 전달 지연 시간(빨간색)만큼 늦게 끝점에 도달합니다. "
                "(실제 HH 모델이 아닌 단순화된 스파이크 파형입니다.)")
 
-    spike_span = max(2.0, total_time * 0.15)  # 스파이크 표시 폭 (그래프가 잘리지 않도록)
-    t_ap = np.linspace(-spike_span * 0.3, total_time + spike_span, 400)
+    ap_duration = 1.0 + 1.5 + 2.5  # t_rise + t_fall + t_recover
+    t_end = total_time + ap_duration + 1.0  # 끝점 파형이 완전히 끝날 때까지 여유 포함
+    t_ap = np.linspace(0, t_end, 500)
     v_start = action_potential(t_ap, onset=0.0)
     v_end = action_potential(t_ap, onset=total_time)
 
@@ -185,6 +205,7 @@ if st.session_state.result_time is not None:
     ax3.plot(t_ap, v_start, color="#1f77b4", linewidth=2.2, label="시작점의 활동전위")
     ax3.plot(t_ap, v_end, color="#d62728", linewidth=2.2, label="끝점의 활동전위")
     ax3.axhline(-70, color="gray", linestyle="--", linewidth=1, alpha=0.6, label="휴지 전위 (-70 mV)")
+    ax3.set_xlim(0, t_end)
     ax3.set_xlabel("시간 (ms)")
     ax3.set_ylabel("막전위 (mV)")
     ax3.set_title("시작점과 끝점에서의 활동전위 비교")
