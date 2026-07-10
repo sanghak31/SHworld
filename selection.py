@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import random
 import pandas as pd
 
@@ -779,6 +780,8 @@ with col1:
         st.session_state.generation = 1
         st.session_state.started = True
         st.session_state.active_events = []
+        st.session_state.history = []
+        record_history_snapshot()
         used_letters_log = ", ".join(
             f"{l}/{l.lower()}" for l in get_gene_letters(num_genes_input)
         )
@@ -865,6 +868,7 @@ with col2:
 
         st.session_state.population = final_population
         st.session_state.generation += 1
+        record_history_snapshot()
 
         cap_log = f"최대 개체수({effective_max_population}) 초과로 {num_capped}마리 사망" if num_capped > 0 else ""
         rate_log = (
@@ -936,6 +940,28 @@ if st.session_state.started:
         st.caption(f"{letter}/{letter.lower()} 대립유전자 비율 : {letter} {upper_str} / {letter.lower()} {lower_str}")
 else:
     st.write("아직 시뮬레이션이 시작되지 않았습니다. '시뮬레이터 시작하기' 버튼을 눌러주세요.")
+
+st.divider()
+
+# ------------------------------------------------------------
+# 중간: 그래프
+# ------------------------------------------------------------
+st.header("📈 그래프")
+
+if st.session_state.history:
+    history_df = pd.DataFrame(st.session_state.history).set_index("generation")
+
+    st.subheader("세대별 개체수 변화")
+    st.line_chart(history_df[["population"]].rename(columns={"population": "총 개체수"}))
+
+    trait_columns = [col for col in history_df.columns if col != "population"]
+    if trait_columns:
+        st.subheader("세대별 대립유전자(우성) 비율 변화 (%)")
+        trait_df = history_df[trait_columns].rename(columns={col: f"{col} 비율(%)" for col in trait_columns})
+        st.line_chart(trait_df)
+        st.caption("각 유전자의 우성 대립유전자(대문자) 비율입니다. 열성 비율은 100%에서 이 값을 뺀 값과 같습니다.")
+else:
+    st.write("아직 기록된 데이터가 없습니다. '시뮬레이터 시작하기' 버튼을 눌러주세요.")
 
 st.divider()
 
