@@ -139,6 +139,19 @@ st.divider()
 # ============================================================
 st.header("📈 그래프")
 
+
+def action_potential(t, onset, rest=-70.0, peak=40.0, ahp=-85.0,
+                      rise=0.3, fall=0.4, ahp_width=0.9):
+    """onset 시점을 기준으로 한 단순화된 활동전위 파형 (mV).
+    실제 Hodgkin-Huxley 방정식이 아닌, 표준 스파이크 모양을 본뜬 근사 모델입니다."""
+    rel = t - onset
+    depol_peak = rise
+    spike = (peak - rest) * np.exp(-0.5 * ((rel - depol_peak) / (rise * 0.6)) ** 2)
+    ahp_time = depol_peak + fall + ahp_width * 0.35
+    dip = (rest - ahp) * np.exp(-0.5 * ((rel - ahp_time) / (ahp_width * 0.5)) ** 2)
+    return rest + spike - dip
+
+
 if st.session_state.result_time is not None:
     total_time = st.session_state.result_time
     t = np.linspace(0, total_time, 200)
@@ -158,5 +171,27 @@ if st.session_state.result_time is not None:
     c1.metric("뉴런 길이", f"{neuron_length} cm")
     c2.metric("전달 속도", f"{signal_speed} cm/ms")
     c3.metric("총 걸린 시간", f"{total_time:.2f} ms")
+
+    st.subheader("🧪 시작점 vs 끝점 활동전위")
+    st.caption("시작점(파란색)에서 발생한 활동전위가 전달 지연 시간(빨간색)만큼 늦게 끝점에 도달합니다. "
+               "(실제 HH 모델이 아닌 단순화된 스파이크 파형입니다.)")
+
+    spike_span = max(2.0, total_time * 0.15)  # 스파이크 표시 폭 (그래프가 잘리지 않도록)
+    t_ap = np.linspace(-spike_span * 0.3, total_time + spike_span, 400)
+    v_start = action_potential(t_ap, onset=0.0)
+    v_end = action_potential(t_ap, onset=total_time)
+
+    fig3, ax3 = plt.subplots(figsize=(10, 4))
+    ax3.plot(t_ap, v_start, color="#1f77b4", linewidth=2.2, label="시작점의 활동전위")
+    ax3.plot(t_ap, v_end, color="#d62728", linewidth=2.2, label="끝점의 활동전위")
+    ax3.axhline(-70, color="gray", linestyle="--", linewidth=1, alpha=0.6, label="휴지 전위 (-70 mV)")
+    ax3.set_xlabel("시간 (ms)")
+    ax3.set_ylabel("막전위 (mV)")
+    ax3.set_title("시작점과 끝점에서의 활동전위 비교")
+    ax3.grid(alpha=0.3)
+    ax3.legend(loc="upper right")
+    fig3.tight_layout()
+    st.pyplot(fig3)
+    plt.close("all")
 else:
     st.info("자극! 버튼을 눌러 시뮬레이션을 실행하면 그래프가 표시됩니다.")
