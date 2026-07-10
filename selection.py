@@ -493,22 +493,48 @@ def record_history_snapshot():
     st.session_state.history.append(entry)
 
 
+EVENT_QUEUE_LENGTH = 10
+
+
+def ensure_event_queue_filled():
+    """이벤트 예고 큐가 항상 EVENT_QUEUE_LENGTH개를 유지하도록 무작위 이벤트로 채움"""
+    event_names = list(EVENTS.keys())
+    while len(st.session_state.event_queue) < EVENT_QUEUE_LENGTH:
+        st.session_state.event_queue.append(random.choice(event_names))
+
+
+def get_event_preview_description(event_name: str) -> str:
+    """아직 발생하지 않은 예고 이벤트의 설명(구체적인 수치 대신 범위로 표시)"""
+    event_def = EVENTS[event_name]
+    format_values = {key: f"{low}~{high}" for key, (low, high) in event_def.get("rolls", {}).items()}
+    if "{trait}" in event_def["description_template"]:
+        format_values["trait"] = "(무작위 대립유전자)"
+    return event_def["description_template"].format(**format_values)
+
+
 def trigger_event(active_events: list, event_chance_percent: float, max_event_count: int, current_num_genes: int):
-    """확률에 따라 새로운 이벤트를 하나 발생시킴 (중복 불가).
-    - 이미 최대 개수에 도달했다면 가장 오래된 이벤트를 제거하고 새 이벤트를 추가
-    - 모든 이벤트가 이미 활성 상태라면 새로 추가할 이벤트가 없으므로 "no_available" 반환
+    """확률에 따라 이벤트 예고 큐의 맨 앞쪽에서 하나를 꺼내 발생시킴 (중복 불가).
+    - 큐에서 현재 활성화되지 않은 이벤트 중 가장 앞선 것을 사용하고, 사용한 자리는 새 이벤트로 채워짐
+    - 이미 최대 개수에 도달했다면 가장 오래된 활성 이벤트를 제거하고 새 이벤트를 추가
+    - 큐 전체가 이미 활성 상태인 이벤트들로만 채워져 있다면 "no_available" 반환
     - 확률에 당첨되지 않으면 (원래 active_events, None) 그대로 반환
-    - 형질 기반 이벤트(기후변화/포식자의 진화)는 대상이 될 유전자와 성질(우성/열성)을 이때 무작위로 정함
+    - 형질 기반 이벤트(기후변화/포식자의 진화/위장)는 대상이 될 유전자와 성질(우성/열성)을 이때 무작위로 정함
     """
     if random.random() >= event_chance_percent / 100:
         return list(active_events), None
 
+    ensure_event_queue_filled()
     active_names = [entry["name"] for entry in active_events]
-    available = [name for name in EVENTS if name not in active_names]
-    if not available:
+
+    chosen_index = next(
+        (i for i, name in enumerate(st.session_state.event_queue) if name not in active_names), None
+    )
+    if chosen_index is None:
         return list(active_events), "no_available"
 
-    new_event_name = random.choice(available)
+    new_event_name = st.session_state.event_queue.pop(chosen_index)
+    ensure_event_queue_filled()
+
     event_def = EVENTS[new_event_name]
     new_entry = {"name": new_event_name, "rolled": roll_event_values(event_def)}
 
@@ -521,6 +547,7 @@ def trigger_event(active_events: list, event_chance_percent: float, max_event_co
         new_active_events.pop(0)  # 가장 오래된 이벤트 제거
     new_active_events.append(new_entry)
     return new_active_events, new_entry
+
 
 
 def compute_event_effects(active_events: list):
@@ -590,6 +617,8 @@ if "started" not in st.session_state:
     st.session_state.num_genes = DEFAULT_NUM_GENES
     st.session_state.active_events = []
     st.session_state.history = []
+    st.session_state.event_queue = []
+    ensure_event_queue_filled()
 
 
 # ------------------------------------------------------------
@@ -962,6 +991,45 @@ if st.session_state.history:
         st.caption("각 유전자의 우성 대립유전자(대문자) 비율입니다. 열성 비율은 100%에서 이 값을 뺀 값과 같습니다.")
 else:
     st.write("아직 기록된 데이터가 없습니다. '시뮬레이터 시작하기' 버튼을 눌러주세요.")
+
+st.divider()
+
+# ------------------------------------------------------------
+# 중간: 이벤트 조작 시스템
+# ------------------------------------------------------------
+st.header("🎛️ 이벤트 조작")
+st.caption(
+    "앞으로 발생할 이벤트 10개를 미리 보여줍니다. 순서를 바꾸거나(▲▼) 삭제(✕)할 수 있습니다. "
+    "실제 발생 시 구체적인 수치와 대상 대립유전자는 그때 무작위로 정해집니다."
+)
+
+ensure_event_queue_filled()
+queue_length = len(st.session_state.event_queue)
+
+for i, event_name in enumerate(list(st.session_state.event_queue)):
+    col_order, col_desc, col_up, col_down, col_delete = st.columns([0.6, 6, 0.7, 0.7, 0.9])
+
+    col_order.markdown(f"**{i + 1}**")
+    col_desc.markdown(f"**{event_name}** : {get_event_preview_description(event_name)}")
+
+    if col_up.button("▲", key=f"event_queue_up_{i}", disabled=(i == 0)):
+        st.session_state.event_queue[i - 1], st.session_state.event_queue[i] = (
+            st.session_state.event_queue[i],
+            st.session_state.event_queue[i - 1],
+        )
+        st.rerun()
+
+    if col_down.button("▼", key=f"event_queue_down_{i}", disabled=(i == queue_length - 1)):
+        st.session_state.event_queue[i + 1], st.session_state.event_queue[i] = (
+            st.session_state.event_queue[i],
+            st.session_state.event_queue[i + 1],
+        )
+        st.rerun()
+
+    if col_delete.button("✕", key=f"event_queue_delete_{i}"):
+        st.session_state.event_queue.pop(i)
+        ensure_event_queue_filled()
+        st.rerun()
 
 st.divider()
 
