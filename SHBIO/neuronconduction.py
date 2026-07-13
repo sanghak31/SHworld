@@ -101,6 +101,37 @@ synapse_delay = st.slider(
 
 synapse_positions_sorted = sorted(synapse_positions)
 
+st.subheader("📍 지점 옵션")
+
+point_count = st.slider(
+    "지점의 개수",
+    min_value=0,
+    max_value=5,
+    value=0,
+    step=1,
+    help="막전위 변화를 관찰하고 싶은 지점의 개수입니다.",
+)
+
+point_labels = [chr(ord("A") + i) for i in range(point_count)]
+point_positions = []
+if point_count > 0:
+    st.markdown("**지점 위치 (cm)**")
+    default_gap_point = neuron_length / (point_count + 1)
+    point_cols = st.columns(point_count)
+    for i, label in enumerate(point_labels):
+        default_val = int(round(default_gap_point * (i + 1)))
+        default_val = min(max(default_val, 0), int(neuron_length))
+        with point_cols[i]:
+            ppos = st.number_input(
+                f"지점 {label}의 위치",
+                min_value=0,
+                max_value=int(neuron_length),
+                value=default_val,
+                step=1,
+                key=f"point_pos_{i}",
+            )
+        point_positions.append(int(ppos))
+
 st.divider()
 
 # ============================================================
@@ -137,6 +168,19 @@ def compute_timeline(length, speed, positions, delay):
     return t_points, pos_points, current_time, synapse_events
 
 
+def arrival_time_at(target_pos, t_points, pos_points):
+    """타임라인(t_points, pos_points) 상에서 자극이 target_pos에 처음 도달하는 시각을 계산합니다."""
+    for i in range(len(pos_points) - 1):
+        p_a, p_b = pos_points[i], pos_points[i + 1]
+        t_a, t_b = t_points[i], t_points[i + 1]
+        if p_a <= target_pos <= p_b:
+            if p_b == p_a:
+                return t_a
+            frac = (target_pos - p_a) / (p_b - p_a)
+            return t_a + frac * (t_b - t_a)
+    return t_points[-1]
+
+
 if "result_time" not in st.session_state:
     st.session_state.result_time = None
 if "timeline" not in st.session_state:
@@ -167,7 +211,7 @@ chart_placeholder = st.empty()
 result_placeholder = st.empty()
 
 
-def draw_neuron(position, length, synapse_positions=None, passing=False):
+def draw_neuron(position, length, synapse_positions=None, points=None, passing=False):
     fig, ax = plt.subplots(figsize=(10, 2.6))
     ax.hlines(0, 0, length, color="#999999", linewidth=6, zorder=1)
     ax.scatter([0], [0], color="#1f77b4", s=140, zorder=2, label="시작점 (세포체)")
@@ -189,6 +233,24 @@ def draw_neuron(position, length, synapse_positions=None, passing=False):
                 ha="center", fontsize=9, color="#9467bd",
             )
 
+    if points:
+        point_positions_list, point_labels_list = points
+        if point_positions_list:
+            ax.scatter(
+                point_positions_list,
+                [0] * len(point_positions_list),
+                color="#17becf",
+                marker="D",
+                s=110,
+                zorder=2,
+                label="지점",
+            )
+            for label, pp in zip(point_labels_list, point_positions_list):
+                ax.annotate(
+                    label, (pp, 0), textcoords="offset points", xytext=(0, -18),
+                    ha="center", fontsize=9, color="#17becf",
+                )
+
     marker_color = "#ff7f0e" if passing else "#d62728"
     ax.scatter([position], [0], color=marker_color, s=220, zorder=3, label="자극 위치")
     if passing:
@@ -198,14 +260,16 @@ def draw_neuron(position, length, synapse_positions=None, passing=False):
     ax.set_ylim(-1, 1)
     ax.set_yticks([])
     ax.set_xlabel("뉴런을 따른 위치 (cm)")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.62), ncol=4, frameon=False, fontsize=8)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.62), ncol=5, frameon=False, fontsize=8)
     fig.tight_layout()
     return fig
 
 
 # 초기 화면 (아직 자극 전)
 if not stimulate and st.session_state.result_time is None:
-    chart_placeholder.pyplot(draw_neuron(0, neuron_length, synapse_positions_sorted))
+    chart_placeholder.pyplot(
+        draw_neuron(0, neuron_length, synapse_positions_sorted, points=(point_positions, point_labels))
+    )
     plt.close("all")
 
 # 자극! 버튼 클릭 시 애니메이션 실행
@@ -230,13 +294,18 @@ if stimulate:
             frac = f / seg_frames
             position = p_a + (p_b - p_a) * frac
             chart_placeholder.pyplot(
-                draw_neuron(position, neuron_length, synapse_positions_sorted, passing=is_pause)
+                draw_neuron(
+                    position, neuron_length, synapse_positions_sorted,
+                    points=(point_positions, point_labels), passing=is_pause,
+                )
             )
             plt.close("all")
             time.sleep(anim_duration / frames_total)
 
     # 최종 위치(끝점) 확실히 표시
-    chart_placeholder.pyplot(draw_neuron(neuron_length, neuron_length, synapse_positions_sorted))
+    chart_placeholder.pyplot(
+        draw_neuron(neuron_length, neuron_length, synapse_positions_sorted, points=(point_positions, point_labels))
+    )
     plt.close("all")
 
     st.session_state.result_time = total_time
@@ -303,6 +372,12 @@ if st.session_state.result_time is not None:
     for ev_time, ev_pos in synapse_events:
         ax2.axvline(ev_time, color="#9467bd", linestyle=":", alpha=0.5)
         ax2.axvspan(ev_time, ev_time + synapse_delay, color="#9467bd", alpha=0.08)
+    for i, label in enumerate(point_labels):
+        ax2.axhline(point_positions[i], color="#17becf", linestyle="--", alpha=0.4)
+        ax2.annotate(
+            label, (t_points[-1], point_positions[i]), textcoords="offset points",
+            xytext=(4, 0), va="center", fontsize=8, color="#17becf",
+        )
     ax2.set_xlabel("시간 (ms)")
     ax2.set_ylabel("자극 위치 (cm)")
     title = "시간에 따른 자극 전달 위치"
@@ -324,8 +399,8 @@ if st.session_state.result_time is not None:
             f"총 {synapse_count * synapse_delay}ms의 시냅스 지연이 포함된 값입니다."
         )
 
-    st.subheader("🧪 시작점 vs 끝점 활동전위")
-    st.caption("시작점(파란색)에서 발생한 활동전위가 전달 지연 시간(빨간색)만큼 늦게 끝점에 도달합니다. "
+    st.subheader("🧪 시작점 / 끝점 / 지점 활동전위")
+    st.caption("시작점(파란색)에서 발생한 활동전위가 전달 지연 시간만큼 늦게 끝점(빨간색)과 각 지점에 도달합니다. "
                "(실제 HH 모델이 아닌 단순화된 스파이크 파형입니다.)")
 
     ap_duration = 1.0 + 1.5 + 2.5  # t_rise + t_fall + t_recover
@@ -337,13 +412,24 @@ if st.session_state.result_time is not None:
     fig3, ax3 = plt.subplots(figsize=(10, 4))
     ax3.plot(t_ap, v_start, color="#1f77b4", linewidth=2.2, label="시작점의 활동전위")
     ax3.plot(t_ap, v_end, color="#d62728", linewidth=2.2, label="끝점의 활동전위")
-    ax3.axhline(-70, color="gray", linestyle="--", linewidth=1, alpha=0.6, label="휴지 전위 (-70 mV)")
+
+    point_colors = ["#2ca02c", "#9467bd", "#8c564b", "#e377c2", "#ff7f0e"]
+    for i, label in enumerate(point_labels):
+        p_pos = point_positions[i]
+        onset_p = arrival_time_at(p_pos, t_points, pos_points)
+        v_p = action_potential(t_ap, onset=onset_p)
+        ax3.plot(
+            t_ap, v_p, color=point_colors[i % len(point_colors)], linewidth=2.0,
+            linestyle="--", label=f"지점 {label}의 활동전위 ({p_pos}cm)",
+        )
+
+    ax3.axhline(-70, color="gray", linestyle=":", linewidth=1, alpha=0.6, label="휴지 전위 (-70 mV)")
     ax3.set_xlim(0, t_end)
     ax3.set_xlabel("시간 (ms)")
     ax3.set_ylabel("막전위 (mV)")
-    ax3.set_title("시작점과 끝점에서의 활동전위 비교")
+    ax3.set_title("시작점 / 끝점 / 지점에서의 활동전위 비교")
     ax3.grid(alpha=0.3)
-    ax3.legend(loc="upper right")
+    ax3.legend(loc="upper right", fontsize=8)
     fig3.tight_layout()
     st.pyplot(fig3)
     plt.close("all")
