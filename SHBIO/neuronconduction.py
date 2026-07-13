@@ -1,4 +1,3 @@
-
 import time
 import glob
 
@@ -61,6 +60,47 @@ with col2:
         help="자극(활동전위)이 축삭을 따라 이동하는 속도입니다.",
     )
 
+st.subheader("🔗 시냅스 옵션")
+
+synapse_count = st.slider(
+    "시냅스 개수",
+    min_value=0,
+    max_value=5,
+    value=0,
+    step=1,
+    help="자극 전달 경로에 존재하는 시냅스의 개수입니다.",
+)
+
+synapse_positions = []
+if synapse_count > 0:
+    st.markdown("**시냅스 위치 (cm)**")
+    default_gap = neuron_length / (synapse_count + 1)
+    pos_cols = st.columns(synapse_count)
+    for i in range(synapse_count):
+        default_val = int(round(default_gap * (i + 1)))
+        default_val = min(max(default_val, 0), int(neuron_length))
+        with pos_cols[i]:
+            pos = st.number_input(
+                f"시냅스 {i + 1}의 위치",
+                min_value=0,
+                max_value=int(neuron_length),
+                value=default_val,
+                step=1,
+                key=f"synapse_pos_{i}",
+            )
+        synapse_positions.append(int(pos))
+
+synapse_delay = st.slider(
+    "시냅스간 자극 전달 시간 (ms)",
+    min_value=1,
+    max_value=100,
+    value=5,
+    step=1,
+    help="자극이 시냅스를 만날 때마다 추가로 소요되는 시간입니다. (시냅스 개수가 0이면 적용되지 않습니다)",
+)
+
+synapse_positions_sorted = sorted(synapse_positions)
+
 st.divider()
 
 # ============================================================
@@ -68,21 +108,58 @@ st.divider()
 # ============================================================
 st.header("▶️ 시뮬레이션")
 
+
+def compute_timeline(length, speed, positions, delay):
+    """뉴런 길이/속도/시냅스 위치/시냅스 지연시간을 받아
+    (시간, 위치) 경로 좌표들과 총 소요 시간, 시냅스 통과 이벤트를 계산합니다."""
+    positions_valid = [p for p in positions if 0 < p < length]
+    boundaries = [0] + sorted(positions_valid) + [length]
+
+    t_points = [0.0]
+    pos_points = [0.0]
+    synapse_events = []  # (통과 시각, 위치)
+    current_time = 0.0
+
+    for i in range(len(boundaries) - 1):
+        a, b = boundaries[i], boundaries[i + 1]
+        seg_time = (b - a) / speed
+        current_time += seg_time
+        t_points.append(current_time)
+        pos_points.append(b)
+
+        is_synapse_boundary = i < len(boundaries) - 2  # 마지막 구간(끝점)이 아니면 시냅스 위치
+        if is_synapse_boundary:
+            synapse_events.append((current_time, b))
+            current_time += delay
+            t_points.append(current_time)
+            pos_points.append(b)
+
+    return t_points, pos_points, current_time, synapse_events
+
+
 if "result_time" not in st.session_state:
     st.session_state.result_time = None
+if "timeline" not in st.session_state:
+    st.session_state.timeline = None
 if "last_length" not in st.session_state:
     st.session_state.last_length = neuron_length
 if "last_speed" not in st.session_state:
     st.session_state.last_speed = signal_speed
+if "last_synapses" not in st.session_state:
+    st.session_state.last_synapses = (tuple(synapse_positions_sorted), synapse_count, synapse_delay)
 
 # 옵션이 바뀌면 이전 결과 초기화
+current_synapses = (tuple(synapse_positions_sorted), synapse_count, synapse_delay)
 if (
     st.session_state.last_length != neuron_length
     or st.session_state.last_speed != signal_speed
+    or st.session_state.last_synapses != current_synapses
 ):
     st.session_state.result_time = None
+    st.session_state.timeline = None
     st.session_state.last_length = neuron_length
     st.session_state.last_speed = signal_speed
+    st.session_state.last_synapses = current_synapses
 
 stimulate = st.button("⚡ 자극!", type="primary", use_container_width=True)
 
@@ -90,45 +167,90 @@ chart_placeholder = st.empty()
 result_placeholder = st.empty()
 
 
-def draw_neuron(position, length):
-    fig, ax = plt.subplots(figsize=(10, 2.2))
+def draw_neuron(position, length, synapse_positions=None, passing=False):
+    fig, ax = plt.subplots(figsize=(10, 2.6))
     ax.hlines(0, 0, length, color="#999999", linewidth=6, zorder=1)
     ax.scatter([0], [0], color="#1f77b4", s=140, zorder=2, label="시작점 (세포체)")
     ax.scatter([length], [0], color="#2ca02c", s=140, zorder=2, label="끝점 (축삭 말단)")
-    ax.scatter([position], [0], color="#d62728", s=220, zorder=3, label="자극 위치")
+
+    if synapse_positions:
+        ax.scatter(
+            synapse_positions,
+            [0] * len(synapse_positions),
+            color="#9467bd",
+            marker="^",
+            s=170,
+            zorder=2,
+            label="시냅스",
+        )
+        for idx, sp in enumerate(synapse_positions, start=1):
+            ax.annotate(
+                f"S{idx}", (sp, 0), textcoords="offset points", xytext=(0, 14),
+                ha="center", fontsize=9, color="#9467bd",
+            )
+
+    marker_color = "#ff7f0e" if passing else "#d62728"
+    ax.scatter([position], [0], color=marker_color, s=220, zorder=3, label="자극 위치")
+    if passing:
+        ax.text(position, 0.55, "시냅스 통과 중...", ha="center", fontsize=10, color="#ff7f0e")
+
     ax.set_xlim(-length * 0.03, length * 1.03)
     ax.set_ylim(-1, 1)
     ax.set_yticks([])
     ax.set_xlabel("뉴런을 따른 위치 (cm)")
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.55), ncol=3, frameon=False)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.62), ncol=4, frameon=False, fontsize=8)
     fig.tight_layout()
     return fig
 
 
 # 초기 화면 (아직 자극 전)
 if not stimulate and st.session_state.result_time is None:
-    chart_placeholder.pyplot(draw_neuron(0, neuron_length))
+    chart_placeholder.pyplot(draw_neuron(0, neuron_length, synapse_positions_sorted))
     plt.close("all")
 
 # 자극! 버튼 클릭 시 애니메이션 실행
 if stimulate:
-    total_time = neuron_length / signal_speed  # ms (실제 계산값)
-    frames = 60
-    anim_duration = 2.0  # 초 단위, 보기 좋게 압축한 애니메이션 재생 시간
+    delay_value = synapse_delay if synapse_count > 0 else 0
+    t_points, pos_points, total_time, synapse_events = compute_timeline(
+        neuron_length, signal_speed, synapse_positions_sorted, delay_value
+    )
 
-    for i in range(frames + 1):
-        frac = i / frames
-        position = frac * neuron_length
-        chart_placeholder.pyplot(draw_neuron(position, neuron_length))
-        plt.close("all")
-        time.sleep(anim_duration / frames)
+    anim_duration = 2.5  # 초 단위, 보기 좋게 압축한 애니메이션 재생 시간
+    frames_total = 70
+    total_units = total_time if total_time > 0 else 1
+
+    for seg_idx in range(len(t_points) - 1):
+        t_a, t_b = t_points[seg_idx], t_points[seg_idx + 1]
+        p_a, p_b = pos_points[seg_idx], pos_points[seg_idx + 1]
+        seg_duration = t_b - t_a
+        seg_frames = max(1, int(round(frames_total * (seg_duration / total_units))))
+        is_pause = (p_a == p_b) and (seg_duration > 0)  # 위치 고정 + 시간 경과 -> 시냅스 통과 중
+
+        for f in range(seg_frames):
+            frac = f / seg_frames
+            position = p_a + (p_b - p_a) * frac
+            chart_placeholder.pyplot(
+                draw_neuron(position, neuron_length, synapse_positions_sorted, passing=is_pause)
+            )
+            plt.close("all")
+            time.sleep(anim_duration / frames_total)
+
+    # 최종 위치(끝점) 확실히 표시
+    chart_placeholder.pyplot(draw_neuron(neuron_length, neuron_length, synapse_positions_sorted))
+    plt.close("all")
 
     st.session_state.result_time = total_time
+    st.session_state.timeline = (t_points, pos_points, synapse_events)
 
 if st.session_state.result_time is not None:
+    synapse_note = (
+        f" (시냅스 {synapse_count}개 통과 지연 {synapse_count * synapse_delay}ms 포함)"
+        if synapse_count > 0
+        else ""
+    )
     result_placeholder.success(
         f"✅ 자극이 시작점부터 끝점({neuron_length} cm)까지 도달하는 데 걸린 시간: "
-        f"**{st.session_state.result_time:.2f} ms**"
+        f"**{st.session_state.result_time:.2f} ms**{synapse_note}"
     )
 else:
     result_placeholder.info("‘자극!’ 버튼을 누르면 시뮬레이션이 시작됩니다.")
@@ -174,14 +296,19 @@ def action_potential(t, onset, t_rise=1.0, t_fall=1.5, t_recover=2.5):
 
 if st.session_state.result_time is not None:
     total_time = st.session_state.result_time
-    t = np.linspace(0, total_time, 200)
-    pos = signal_speed * t
+    t_points, pos_points, synapse_events = st.session_state.timeline
 
     fig2, ax2 = plt.subplots(figsize=(10, 4))
-    ax2.plot(t, pos, color="#d62728", linewidth=2.5)
+    ax2.plot(t_points, pos_points, color="#d62728", linewidth=2.5)
+    for ev_time, ev_pos in synapse_events:
+        ax2.axvline(ev_time, color="#9467bd", linestyle=":", alpha=0.5)
+        ax2.axvspan(ev_time, ev_time + synapse_delay, color="#9467bd", alpha=0.08)
     ax2.set_xlabel("시간 (ms)")
     ax2.set_ylabel("자극 위치 (cm)")
-    ax2.set_title("시간에 따른 자극 전달 위치")
+    title = "시간에 따른 자극 전달 위치"
+    if synapse_events:
+        title += " (보라색 구간 = 시냅스 통과 지연)"
+    ax2.set_title(title)
     ax2.grid(alpha=0.3)
     fig2.tight_layout()
     st.pyplot(fig2)
@@ -191,6 +318,11 @@ if st.session_state.result_time is not None:
     c1.metric("뉴런 길이", f"{neuron_length} cm")
     c2.metric("전달 속도", f"{signal_speed} cm/ms")
     c3.metric("총 걸린 시간", f"{total_time:.2f} ms")
+    if synapse_count > 0:
+        st.caption(
+            f"시냅스 {synapse_count}개 × {synapse_delay}ms = "
+            f"총 {synapse_count * synapse_delay}ms의 시냅스 지연이 포함된 값입니다."
+        )
 
     st.subheader("🧪 시작점 vs 끝점 활동전위")
     st.caption("시작점(파란색)에서 발생한 활동전위가 전달 지연 시간(빨간색)만큼 늦게 끝점에 도달합니다. "
