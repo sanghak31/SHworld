@@ -153,7 +153,7 @@ st.divider()
 # ---------------------------------------------------------------
 st.subheader("시뮬레이션")
 
-b1, b2, b3, b4, b5 = st.columns(5)
+b1, b2, b3, b4, b5, b6, b7 = st.columns(7)
 with b1:
     start_clicked = st.button("시뮬레이션 시작", type="primary", use_container_width=True)
 with b2:
@@ -161,14 +161,22 @@ with b2:
         "다음 일차", use_container_width=True, disabled=not st.session_state.started
     )
 with b3:
+    skip10_clicked = st.button(
+        "10일 넘기기", use_container_width=True, disabled=not st.session_state.started
+    )
+with b4:
+    skip30_clicked = st.button(
+        "30일 넘기기", use_container_width=True, disabled=not st.session_state.started
+    )
+with b5:
     inject_a = st.toggle(
         "바이러스 A 주입", key="inject_a", disabled=not st.session_state.started
     )
-with b4:
+with b6:
     inject_b = st.toggle(
         "바이러스 B 주입", key="inject_b", disabled=not st.session_state.started
     )
-with b5:
+with b7:
     inject_c = st.toggle(
         "바이러스 C 주입", key="inject_c", disabled=not st.session_state.started
     )
@@ -191,30 +199,48 @@ if start_clicked:
     st.session_state.reset_toggles = True
     st.rerun()
 
-# ---- 다음 일차 처리 ----
-if next_clicked and st.session_state.started:
-    new_state = next_day_state(
-        st.session_state.state,
-        inject_a, inject_b, inject_c,
-        st.session_state.immunity_factor,
-        st.session_state.aids_on,
-        st.session_state.t_baseline,
-    )
-    st.session_state.state = new_state
-    st.session_state.day += 1
 
+def advance_days(n_days, inj_a, inj_b, inj_c):
+    """n_days만큼 하루씩 진행하며 매일의 기록을 history에 쌓는다.
+    바이러스 주입은 이 구간의 첫째 날에만 적용되고, 이후 날짜에는 적용되지 않는다."""
+    state = st.session_state.state
     h = st.session_state.history
-    h["day"].append(st.session_state.day)
-    h["T"].append(new_state["T"])
-    h["Va"].append(new_state["Va"])
-    h["Vb"].append(new_state["Vb"])
-    h["Vc"].append(new_state["Vc"])
-    h["Aa"].append(new_state["Aa"])
-    h["Ab"].append(new_state["Ab"])
-    h["Ac"].append(new_state["Ac"])
+    for i in range(n_days):
+        ia = inj_a if i == 0 else False
+        ib = inj_b if i == 0 else False
+        ic = inj_c if i == 0 else False
+        state = next_day_state(
+            state, ia, ib, ic,
+            st.session_state.immunity_factor,
+            st.session_state.aids_on,
+            st.session_state.t_baseline,
+        )
+        st.session_state.day += 1
+        h["day"].append(st.session_state.day)
+        h["T"].append(state["T"])
+        h["Va"].append(state["Va"])
+        h["Vb"].append(state["Vb"])
+        h["Vc"].append(state["Vc"])
+        h["Aa"].append(state["Aa"])
+        h["Ab"].append(state["Ab"])
+        h["Ac"].append(state["Ac"])
+    st.session_state.state = state
 
-    st.session_state.reset_toggles = True
-    st.rerun()
+
+# ---- 다음 일차 / 10일 넘기기 / 30일 넘기기 처리 ----
+if st.session_state.started:
+    if next_clicked:
+        advance_days(1, inject_a, inject_b, inject_c)
+        st.session_state.reset_toggles = True
+        st.rerun()
+    elif skip10_clicked:
+        advance_days(10, inject_a, inject_b, inject_c)
+        st.session_state.reset_toggles = True
+        st.rerun()
+    elif skip30_clicked:
+        advance_days(30, inject_a, inject_b, inject_c)
+        st.session_state.reset_toggles = True
+        st.rerun()
 
 # ---- 현재 상태 요약 ----
 if st.session_state.started:
