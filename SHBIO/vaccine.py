@@ -64,8 +64,10 @@ INOCULATION_DOSE = 60.0
 CARRYING_CAPACITY = 1000.0
 VIRUS_GROWTH_RATE = 0.35
 CLEARANCE_COEF = 0.0035
-AB_PROD_COEF = 0.025
-AB_DECAY = 0.06
+CLEAR_THRESHOLD = 1.0        # 이 값 밑으로 떨어지면 바이러스가 완전히 사라진 것으로 간주
+PRIMARY_AB_RATE = 4.0        # 최초 감염 시 하루당 항체 증가량
+SECONDARY_AB_RATE = 25.0     # 기억세포가 있을 때(재감염) 하루당 항체 증가량
+AB_DECAY_CLEARED = 0.30      # 바이러스 소멸 후 하루당 항체 감소 비율
 T_REGEN_RATE = 0.05
 T_CONSUMPTION_COEF = 0.01
 AIDS_DECLINE_RATE = 0.04
@@ -76,6 +78,7 @@ def next_day_state(state, inject_a, inject_b, inject_c, immunity_factor, aids_on
     T = state["T"]
     Va, Vb, Vc = state["Va"], state["Vb"], state["Vc"]
     Aa, Ab, Ac = state["Aa"], state["Ab"], state["Ac"]
+    mem_a, mem_b, mem_c = state["mem_a"], state["mem_b"], state["mem_c"]
 
     # 1. 바이러스 주입 (해당 토글이 켜져 있으면 이 날 침입)
     if inject_a:
@@ -85,24 +88,34 @@ def next_day_state(state, inject_a, inject_b, inject_c, immunity_factor, aids_on
     if inject_c:
         Vc += INOCULATION_DOSE
 
-    t_ref = max(1.0, t_baseline)
+    def grow_antibody(A, V, has_memory):
+        # 바이러스가 남아 있는 한 항체는 매일 조금씩(또는 기억세포가 있다면 빠르게) 꾸준히 증가한다.
+        if V > CLEAR_THRESHOLD:
+            rate = SECONDARY_AB_RATE if has_memory else PRIMARY_AB_RATE
+            return A + rate * immunity_factor
+        # 바이러스가 완전히 사라지면 항체 농도는 빠르게 줄어든다.
+        return max(0.0, A * (1 - AB_DECAY_CLEARED))
+
+    n_Aa = grow_antibody(Aa, Va, mem_a)
+    n_Ab = grow_antibody(Ab, Vb, mem_b)
+    n_Ac = grow_antibody(Ac, Vc, mem_c)
 
     def grow_virus(V, A):
         growth = VIRUS_GROWTH_RATE * V * (1 - V / CARRYING_CAPACITY)
         clearance = CLEARANCE_COEF * A * V * immunity_factor
-        return min(CARRYING_CAPACITY * 1.05, max(0.0, V + growth - clearance))
-
-    def grow_antibody(A, V):
-        production = AB_PROD_COEF * V * (T / t_ref) * immunity_factor
-        return max(0.0, A + production - AB_DECAY * A)
-
-    n_Aa = grow_antibody(Aa, Va)
-    n_Ab = grow_antibody(Ab, Vb)
-    n_Ac = grow_antibody(Ac, Vc)
+        new_v = V + growth - clearance
+        if new_v < CLEAR_THRESHOLD:
+            new_v = 0.0  # 완전히 소멸
+        return min(CARRYING_CAPACITY * 1.05, max(0.0, new_v))
 
     n_Va = grow_virus(Va, Aa)
     n_Vb = grow_virus(Vb, Ab)
     n_Vc = grow_virus(Vc, Ac)
+
+    # 감염이 이번 스텝에서 완전히 사라졌다면, 다음 재노출을 위한 기억세포를 형성한다.
+    n_mem_a = mem_a or (Va > CLEAR_THRESHOLD and n_Va == 0.0)
+    n_mem_b = mem_b or (Vb > CLEAR_THRESHOLD and n_Vb == 0.0)
+    n_mem_c = mem_c or (Vc > CLEAR_THRESHOLD and n_Vc == 0.0)
 
     total_virus = Va + Vb + Vc
     if aids_on:
@@ -110,7 +123,11 @@ def next_day_state(state, inject_a, inject_b, inject_c, immunity_factor, aids_on
     else:
         n_T = max(0.0, T + T_REGEN_RATE * (t_baseline - T) - T_CONSUMPTION_COEF * total_virus)
 
-    return {"T": n_T, "Va": n_Va, "Vb": n_Vb, "Vc": n_Vc, "Aa": n_Aa, "Ab": n_Ab, "Ac": n_Ac}
+    return {
+        "T": n_T, "Va": n_Va, "Vb": n_Vb, "Vc": n_Vc,
+        "Aa": n_Aa, "Ab": n_Ab, "Ac": n_Ac,
+        "mem_a": n_mem_a, "mem_b": n_mem_b, "mem_c": n_mem_c,
+    }
 
 
 # ---------------------------------------------------------------
@@ -183,7 +200,10 @@ with b7:
 
 # ---- 시뮬레이션 시작 처리 ----
 if start_clicked:
-    init_state = {"T": float(init_t), "Va": 0.0, "Vb": 0.0, "Vc": 0.0, "Aa": 0.0, "Ab": 0.0, "Ac": 0.0}
+    init_state = {
+        "T": float(init_t), "Va": 0.0, "Vb": 0.0, "Vc": 0.0, "Aa": 0.0, "Ab": 0.0, "Ac": 0.0,
+        "mem_a": False, "mem_b": False, "mem_c": False,
+    }
     st.session_state.started = True
     st.session_state.day = 1
     st.session_state.state = init_state
@@ -250,9 +270,9 @@ if st.session_state.started:
         <div class="status-box">
         현재 <b>{st.session_state.day}일차</b> · 후천성 면역 결핍증: {"ON" if st.session_state.aids_on else "OFF"}<br>
         보조 T림프구 수&nbsp;: <span style="color:{T_COLOR}">{s['T']:.1f}</span><br>
-        바이러스 A&nbsp;/&nbsp;항체 A&nbsp;: <span style="color:{VA_COLOR}">{s['Va']:.1f}</span> / {s['Aa']:.1f}<br>
-        바이러스 B&nbsp;/&nbsp;항체 B&nbsp;: <span style="color:{VB_COLOR}">{s['Vb']:.1f}</span> / {s['Ab']:.1f}<br>
-        바이러스 C&nbsp;/&nbsp;항체 C&nbsp;: <span style="color:{VC_COLOR}">{s['Vc']:.1f}</span> / {s['Ac']:.1f}
+        바이러스 A&nbsp;/&nbsp;항체 A&nbsp;: <span style="color:{VA_COLOR}">{s['Va']:.1f}</span> / {s['Aa']:.1f} {"🧠" if s['mem_a'] else ""}<br>
+        바이러스 B&nbsp;/&nbsp;항체 B&nbsp;: <span style="color:{VB_COLOR}">{s['Vb']:.1f}</span> / {s['Ab']:.1f} {"🧠" if s['mem_b'] else ""}<br>
+        바이러스 C&nbsp;/&nbsp;항체 C&nbsp;: <span style="color:{VC_COLOR}">{s['Vc']:.1f}</span> / {s['Ac']:.1f} {"🧠" if s['mem_c'] else ""}
         </div>
         """,
         unsafe_allow_html=True,
