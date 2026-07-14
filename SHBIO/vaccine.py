@@ -296,11 +296,31 @@ else:
     fig.add_trace(go.Scatter(x=days, y=h["Ac"], mode="lines", name="바이러스 C 항체 농도",
                               line=dict(color=VC_COLOR, width=2, dash="dash")))
 
+    max_day = days[-1]
+    if max_day <= 10:
+        tick_step = 1
+        tick_vals = list(range(1, max_day + 1, tick_step))
+    elif max_day <= 100:
+        tick_step = 5
+        tick_vals = list(range(5, max_day + 1, tick_step))
+    else:
+        tick_step = 10
+        tick_vals = list(range(10, max_day + 1, tick_step))
+    if not tick_vals:
+        tick_vals = [max_day]
+
     fig.update_layout(
         plot_bgcolor="#142629",
         paper_bgcolor="#142629",
         font=dict(color="#EDE7DA"),
-        xaxis=dict(title="일차", gridcolor="#2A4448", dtick=1),
+        xaxis=dict(
+            title="일차",
+            gridcolor="#2A4448",
+            tickmode="array",
+            tickvals=tick_vals,
+            ticktext=[str(d) for d in tick_vals],
+            range=[0.5, max_day + 0.5],
+        ),
         yaxis=dict(title="수치", gridcolor="#2A4448"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         margin=dict(l=10, r=10, t=40, b=10),
