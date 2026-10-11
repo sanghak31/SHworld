@@ -178,4 +178,4 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="site-footer">by LST</div>', unsafe_allow_html=True)
+st.markdown('<div class="site-footer">by LSH</div>', unsafe_allow_html=True)
