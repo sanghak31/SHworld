@@ -16,13 +16,13 @@ SECTIONS = [
         "desc": "염기서열에서 개체군의 변화까지",
         "apps": [
             {
-                "name": "DNA 염기서열 변환기",
+                "name": "DNA 염기서열 변환기 🧬",
                 "desc": "DNA 염기서열을 입력해 변환하고 분석해 봅니다.",
                 "url": "https://geneticanalysis.streamlit.app/",
                 "color": "#1f8a70",
             },
             {
-                "name": "자연선택",
+                "name": "자연선택 🦎",
                 "desc": "환경 조건에 따라 개체군이 어떻게 달라지는지 관찰합니다.",
                 "url": "https://naturalselection.streamlit.app/",
                 "color": "#d9822b",
@@ -34,19 +34,19 @@ SECTIONS = [
         "desc": "몸속 조절 작용과 면역 반응",
         "apps": [
             {
-                "name": "면역 반응 시뮬레이션",
+                "name": "면역 반응 시뮬레이션 🛡️",
                 "desc": "백신 접종 이후 면역 반응이 진행되는 과정을 살펴봅니다.",
                 "url": "https://shvaccinesimulation.streamlit.app/",
                 "color": "#3b6fb6",
             },
             {
-                "name": "ADH 시뮬레이션",
+                "name": "ADH 시뮬레이션 💧",
                 "desc": "항이뇨 호르몬(ADH)에 따른 체내 수분 조절을 확인합니다.",
                 "url": "https://adhsimulation.streamlit.app/",
                 "color": "#8a5db3",
             },
             {
-                "name": "TI 시뮬레이션",
+                "name": "TI 시뮬레이션 🧪",
                 "desc": "변수를 조절하며 결과가 어떻게 바뀌는지 실험해 봅니다.",
                 "url": "https://tisimulation.streamlit.app/",
                 "color": "#2f9aa8",
@@ -58,7 +58,7 @@ SECTIONS = [
         "desc": "자극이 전달되는 과정",
         "apps": [
             {
-                "name": "뉴런 흥분 전도",
+                "name": "뉴런 흥분 전도 ⚡",
                 "desc": "뉴런에서 흥분이 전도되는 과정을 단계별로 확인합니다.",
                 "url": "https://neuronconduction.streamlit.app/",
                 "color": "#c4475a",
@@ -76,8 +76,9 @@ st.markdown(
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&display=swap');
 .block-container{max-width:1080px;padding-top:2.5rem;}
 header[data-testid="stHeader"]{background:transparent;}
-.hero-title{font-family:'Noto Serif KR',serif;font-weight:900;
-  font-size:clamp(2rem,4.6vw,3.2rem);line-height:1.3;letter-spacing:-.02em;margin:0 0 .8rem;}
+.hero-title{font-family:'Noto Serif KR',serif !important;font-weight:900 !important;
+  font-size:clamp(1.4rem,3vw,2.4rem) !important;line-height:1.35 !important;letter-spacing:-.02em;
+  margin:0 0 .8rem !important;padding:0 !important;word-break:keep-all;}
 .hero-lead{opacity:.75;font-size:1.05rem;line-height:1.7;margin:0;max-width:34em;}
 .sec-title{font-family:'Noto Serif KR',serif;font-weight:700;font-size:1.35rem;margin:1.8rem 0 .1rem;}
 .sec-desc{opacity:.7;font-size:.95rem;margin:0 0 .9rem;}
@@ -91,6 +92,8 @@ a.card:focus-visible{outline:3px solid var(--c);outline-offset:3px;}
 a.card h3{margin:0;padding:0;font-size:1.12rem;color:inherit;}
 a.card p{margin:0;opacity:.75;font-size:.93rem;line-height:1.6;flex:1;}
 a.card .go{color:var(--c);font-weight:600;font-size:.92rem;margin-top:6px;}
+.site-footer{border-top:1px solid rgba(128,128,128,.28);margin-top:2rem;padding:1.1rem 0 .5rem;
+  text-align:center;opacity:.7;font-size:.9rem;}
 .note{border-left:4px solid #d9822b;padding:.3rem .9rem;opacity:.75;font-size:.9rem;margin:2rem 0 1rem;}
 @media (prefers-reduced-motion:reduce){a.card{transition:none;}}
 </style>
@@ -138,7 +141,7 @@ HELIX_HTML = """
 </script>
 """
 
-left, right = st.columns([1.1, 0.9], vertical_alignment="center")
+left, right = st.columns([1.25, 0.75], vertical_alignment="center")
 with left:
     st.markdown(
         '<h1 class="hero-title">눈에 보이지 않는 생명 현상을,<br>직접 움직여 보세요</h1>'
@@ -174,3 +177,5 @@ st.markdown(
     "한동안 접속이 없었다면 처음 열 때 깨우는 데 잠시 걸릴 수 있어요.</div>",
     unsafe_allow_html=True,
 )
+
+st.markdown('<div class="site-footer">by LST</div>', unsafe_allow_html=True)
