@@ -28,6 +28,43 @@ def color_sequence(seq):
 
 
 # ==========================
+# DNA 이중가닥 표시 (필요할 때 st.markdown(..., unsafe_allow_html=True)로 사용)
+# ==========================
+def double_strand_html(top, bottom):
+
+    html = """
+    <div style="
+        font-family:Consolas, monospace;
+        font-size:28px;
+        line-height:1.4;
+        white-space:pre;
+    ">
+    """
+
+    # 윗가닥
+    for base in top:
+        color = colors.get(base, "black")
+        html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
+
+    html += "<br>"
+
+    # 가운데 연결선
+    for _ in top:
+        html += '<span style="color:#777;">│</span> '
+
+    html += "<br>"
+
+    # 아랫가닥
+    for base in bottom:
+        color = colors.get(base, "black")
+        html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
+
+    html += "</div>"
+
+    return html
+
+
+# ==========================
 # 상보적 DNA
 # ==========================
 dna_pair = {
@@ -109,7 +146,8 @@ def mutate_dna(sequence, mutation_count):
         dna_list[pos] = random.choice(candidates)
 
     return "".join(dna_list)
-    
+
+
 # ==========================
 # Session State 초기화
 # ==========================
@@ -131,9 +169,7 @@ COLLAGEN_DNA = "ATGGTGCTGCTGGCCCTGCTGGCCCTGCTG"
 
 SICKLE_HBB_DNA = "ATGGTGCACCTGACTCCTGTGGAGAAGTCT"
 
-# 초기 상태일 때만 프리셋 버튼 표시
-
-col1, col2, col3, col4= st.columns(4)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     if st.button("🩸 헤모글로빈(HBB)"):
@@ -146,6 +182,7 @@ with col2:
         st.session_state.dna_input = INS_DNA
         st.session_state.converted = False
         st.rerun()
+
 with col3:
     if st.button("🦴 콜라겐(COL1A1)"):
         st.session_state.dna_input = COLLAGEN_DNA
@@ -157,7 +194,6 @@ with col4:
         st.session_state.dna_input = SICKLE_HBB_DNA
         st.session_state.converted = False
         st.rerun()
-
 
 
 # ==========================
@@ -235,80 +271,22 @@ if convert:
     valid = {"A", "C", "G", "T"}
 
     if dna == "":
+        st.session_state.converted = False
         st.error("DNA를 입력하세요.")
 
     elif not all(base in valid for base in dna):
+        st.session_state.converted = False
         st.error("❌ 제대로 입력하세요! (A, C, G, T만 입력 가능합니다.)")
 
     else:
 
-        st.session_state.converted = True
-
-        opposite_dna = "".join(dna_pair[b] for b in dna)
-
-        rna = opposite_dna.replace("T", "U")
-
-        amino_list = []
-
-        for i in range(0, len(rna), 3):
-
-            codon = rna[i:i+3]
-
-            if len(codon) == 3:
-                amino_list.append(codon_table.get(codon, "알수없음"))
-            else:
-                amino_list.append("알수없음")
-
-        amino_result = " - ".join(amino_list)
-
-        st.session_state.opposite = opposite_dna
-        st.session_state.rna = rna
-        st.session_state.amino = amino_result
-
-        # -------------------
         # 상보적 DNA
-        # -------------------
         opposite_dna = "".join(dna_pair[b] for b in dna)
 
-        # -------------------
-        #  염기 개수 통계
-        # -------------------
-        count_A = dna.count("A")
-        count_T = dna.count("T")
-        count_G = dna.count("G")
-        count_C = dna.count("C")
-        
-        total = len(dna)
-
-        # -------------------
-        # GC 함량
-        # -------------------
-        gc_content = ((count_G + count_C) / total) * 100
-
-        # -------------------
         # RNA
-        # -------------------
         rna = opposite_dna.replace("T", "U")
 
-        # -------------------
-    # 시작/종결 코돈 분석
-    # -------------------
-    start_exists = "AUG" in rna
-    
-    stop_codons = []
-
-    if "UAA" in rna:
-        stop_codons.append("UAA")
-
-    if "UAG" in rna:
-        stop_codons.append("UAG")
-
-    if "UGA" in rna:
-        stop_codons.append("UGA")
-
-        # -------------------
         # 아미노산
-        # -------------------
         amino_list = []
 
         for i in range(0, len(rna), 3):
@@ -322,24 +300,41 @@ if convert:
 
         amino_result = " - ".join(amino_list)
 
-        # 결과 저장
+        # 시작/종결 코돈 분석
+        start_exists = "AUG" in rna
+        stop_codons = [c for c in ("UAA", "UAG", "UGA") if c in rna]
+
+        # 결과 저장 (항상 모든 값이 함께 저장되도록 한 곳에서 처리)
+        st.session_state.converted_dna = dna
         st.session_state.opposite = opposite_dna
         st.session_state.rna = rna
         st.session_state.amino = amino_result
         st.session_state.start_exists = start_exists
         st.session_state.stop_codons = stop_codons
+        st.session_state.converted = True
 
 
 # ==========================
 # 결과 출력
 # ==========================
-if st.session_state.converted:
+if st.session_state.get("converted", False):
 
     st.success("변환 완료!")
 
+    # 변환 시점의 DNA를 기준으로 통계를 계산
+    dna_now = st.session_state.converted_dna
+
+    count_A = dna_now.count("A")
+    count_T = dna_now.count("T")
+    count_G = dna_now.count("G")
+    count_C = dna_now.count("C")
+
+    total = len(dna_now)
+
+    gc_content = ((count_G + count_C) / total) * 100
+
     st.write("## 입력한 DNA")
-    st.markdown(color_sequence(st.session_state.dna_input.upper()),
-                unsafe_allow_html=True)
+    st.markdown(color_sequence(dna_now), unsafe_allow_html=True)
 
     st.write("## 반대쪽 DNA")
     st.markdown(color_sequence(st.session_state.opposite),
@@ -354,21 +349,10 @@ if st.session_state.converted:
         f"{total} bp"
     )
 
-    dna_now = st.session_state.dna_input.upper()
-
-    count_A = dna_now.count("A")
-    count_T = dna_now.count("T")
-    count_G = dna_now.count("G")
-    count_C = dna_now.count("C")
-
-    total = len(dna_now)
-
-    gc_content = ((count_G + count_C) / total) * 100
-
     st.write("### 염기 개수 통계")
 
     col1, col2, col3, col4 = st.columns(4)
-    
+
     col1.metric("🟢 A", count_A)
     col2.metric("🔴 T", count_T)
     col3.metric("🟡 G", count_G)
@@ -405,42 +389,6 @@ if st.session_state.converted:
             "🔴 종결 코돈 발견 : "
             + ", ".join(st.session_state.stop_codons)
         )
-
-        # ==========================
-        # DNA 이중가닥 표시
-        # ==========================
-        def double_strand_html(top, bottom):
-    
-            html = """
-            <div style="
-                font-family:Consolas, monospace;
-                font-size:28px;
-                line-height:1.4;
-                white-space:pre;
-            ">
-            """
-
-            # 윗가닥
-            for base in top:
-                color = colors.get(base, "black")
-                html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
-
-            html += "<br>"
-
-            # 가운데 연결선
-            for _ in top:
-                html += '<span style="color:#777;">│</span> '
-
-            html += "<br>"
-
-            # 아랫가닥
-            for base in bottom:
-                color = colors.get(base, "black")
-                html += f'<span style="color:{color}; font-weight:bold;">{base}</span> '
-
-            html += "</div>"
-
-            return html
 
     st.write("## 아미노산")
     st.success(st.session_state.amino)
