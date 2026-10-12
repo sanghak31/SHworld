@@ -116,6 +116,7 @@ a.card .go{color:var(--c);font-weight:600;font-size:.92rem;margin-top:6px;}
 # 히어로: 제목 + 회전하는 DNA 이중나선
 # ──────────────────────────────────────────────
 HELIX_HTML = """
+<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}svg{display:block;}</style>
 <svg id="helix" viewBox="0 0 320 340" width="100%" height="320"
      role="img" aria-label="천천히 회전하는 DNA 이중나선"></svg>
 <script>
