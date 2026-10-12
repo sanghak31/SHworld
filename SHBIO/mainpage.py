@@ -65,8 +65,7 @@ SECTIONS = [
             {
                 "name": "뉴런 탐색 · 신경의 종류 🧠",
                 "desc": "그림과 함께 신경의 종류를 하나씩 넘겨 보며 알아봅니다.",
-                # 배포한 뒤 생긴 앱 주소를 아래에 넣으면 카드가 열립니다.
-                "url": "",
+                "url": "https://neuronexplore.streamlit.app/",
                 "color": "#e07b39",
             },
         ],
