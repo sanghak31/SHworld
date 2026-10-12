@@ -39,9 +39,14 @@ st.markdown(
   background:rgba(128,128,128,.15);border:1px solid rgba(128,128,128,.3);font-size:1.02rem;}
 .tube{width:80px;height:230px;margin:0 auto;border:3px solid rgba(128,128,128,.6);
   border-top:none;border-radius:0 0 40px 40px;overflow:hidden;display:flex;flex-direction:column;}
+.tube.sm{width:60px;height:160px;border-radius:0 0 30px 30px;}
 .tube .sup{flex:3;background:rgba(90,160,230,.35);display:flex;align-items:center;justify-content:center;font-size:.8rem;}
 .tube .pel{flex:1;background:rgba(150,85,45,.75);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#fff;}
-.tube .empty{flex:1;}
+.tube .empty,.tube .gap{flex:1;}
+.tube .whole{flex:1;background-color:rgba(120,170,110,.30);
+  background-image:radial-gradient(circle,rgba(60,110,50,.6) 2px,transparent 2.5px),radial-gradient(circle,rgba(150,85,45,.55) 3px,transparent 3.5px);
+  background-size:14px 14px,22px 22px;background-position:0 0,7px 9px;}
+.tube-label{text-align:center;font-size:.85rem;opacity:.75;margin-top:6px;}
 </style>
 """,
     unsafe_allow_html=True,
@@ -57,8 +62,35 @@ ss.setdefault("split", None)    # 원심분리 결과 (상층액, 침전물)
 ss.setdefault("slots", [None] * SLOT_COUNT)
 
 
+# 용액의 종류: whole(원심분리 전) / sup(상층액) / pel(침전물)
+KIND_ICON = {"whole": "🟢", "sup": "🔵", "pel": "🟤"}
+
+
 def copy_solution(sol):
-    return {"name": sol["name"], "organelles": list(sol["organelles"])}
+    return {
+        "name": sol["name"],
+        "organelles": list(sol["organelles"]),
+        "kind": sol.get("kind", "whole"),
+    }
+
+
+def single_tube_html(sol, small=False):
+    """용액 종류에 따라 다른 시험관 그림을 만든다."""
+    kind = sol.get("kind", "whole")
+    if kind == "whole":
+        inner = '<div class="whole"></div>'
+        text = "아직 원심분리하지 않은 용액"
+    elif kind == "sup":
+        inner = '<div class="sup" style="flex:1"></div>'
+        text = "상층액만 있는 용액"
+    else:
+        if sol["organelles"]:
+            inner = '<div class="gap"></div><div class="pel" style="flex:0 0 26%"></div>'
+        else:
+            inner = '<div class="empty"></div>'
+        text = "침전물만 있는 용액"
+    cls = "tube sm" if small else "tube"
+    return f'<div class="{cls}">{inner}</div><div class="tube-label">{text}</div>'
 
 
 def chips(names):
@@ -75,8 +107,8 @@ def centrifuge(g, minutes):
     label = f"{g:,}g·{minutes}분"
     ss.split = {
         "label": label,
-        "sup": {"name": f"{base} → {label} 상층액", "organelles": supernatant},
-        "pel": {"name": f"{base} → {label} 침전물", "organelles": pellet},
+        "sup": {"name": f"{base} → {label} 상층액", "organelles": supernatant, "kind": "sup"},
+        "pel": {"name": f"{base} → {label} 침전물", "organelles": pellet, "kind": "pel"},
     }
 
 
@@ -98,13 +130,13 @@ def mode_type(m):
 
 
 if c1.button("🐾 균질화된 동물세포액", use_container_width=True):
-    ss.target = {"name": "균질화된 동물세포액", "organelles": list(ANIMAL_CONTENTS)}
+    ss.target = {"name": "균질화된 동물세포액", "organelles": list(ANIMAL_CONTENTS), "kind": "whole"}
     ss.split = None
     ss.mode = None
     st.rerun()
 
 if c2.button("🌱 균질화된 식물세포액", use_container_width=True):
-    ss.target = {"name": "균질화된 식물세포액", "organelles": list(PLANT_CONTENTS)}
+    ss.target = {"name": "균질화된 식물세포액", "organelles": list(PLANT_CONTENTS), "kind": "whole"}
     ss.split = None
     ss.mode = None
     st.rerun()
@@ -134,7 +166,9 @@ st.subheader("🧪 현재 대상 용액")
 if ss.target is None:
     st.info("먼저 '균질화된 동물세포액' 또는 '균질화된 식물세포액'을 눌러 대상 용액을 정하세요.")
 else:
-    st.markdown(f"### {ss.target['name']}")
+    tcol, ncol = st.columns([1, 5], vertical_alignment="center")
+    tcol.markdown(single_tube_html(ss.target, small=True), unsafe_allow_html=True)
+    ncol.markdown(f"### {ss.target['name']}")
 
 # ==========================
 # 모드별 패널
@@ -233,7 +267,7 @@ for row in range(2):
                         ss.mode = None
                         st.rerun()
             else:
-                st.caption(slot["name"])
+                st.caption(f'{KIND_ICON[slot.get("kind", "whole")]} {slot["name"]}')
                 if ss.mode == "load":
                     if st.button("불러오기", key=f"load_{i}", use_container_width=True):
                         ss.target = copy_solution(slot)
