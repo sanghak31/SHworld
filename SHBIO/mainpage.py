@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="생명과학 시뮬레이션 실험실",
@@ -62,6 +61,18 @@ SECTIONS = [
                 "desc": "뉴런에서 흥분이 전도되는 과정을 단계별로 확인합니다.",
                 "url": "https://neuronconduction.streamlit.app/",
                 "color": "#c4475a",
+            },
+        ],
+    },
+    {
+        "title": "세포와 실험",
+        "desc": "세포소기관을 분리하는 실험 기법",
+        "apps": [
+            {
+                "name": "세포 분획법 실험실 🧫",
+                "desc": "균질화한 세포액을 원심분리해 세포소기관을 분리하고 분석해 봅니다.",
+                "url": "https://fractionation.streamlit.app/",
+                "color": "#6a9a3a",
             },
         ],
     },
@@ -141,6 +152,15 @@ HELIX_HTML = """
 </script>
 """
 
+def render_html(html, height):
+    """최신 Streamlit은 st.iframe, 이전 버전은 components.html을 사용합니다."""
+    if hasattr(st, "iframe"):
+        st.iframe(html.strip(), height=height)
+    else:
+        import streamlit.components.v1 as components
+        components.html(html, height=height)
+
+
 left, right = st.columns([1.25, 0.75], vertical_alignment="center")
 with left:
     st.markdown(
@@ -150,7 +170,7 @@ with left:
         unsafe_allow_html=True,
     )
 with right:
-    components.html(HELIX_HTML, height=330)
+    render_html(HELIX_HTML, height=330)
 
 # ──────────────────────────────────────────────
 # 시뮬레이션 카드
