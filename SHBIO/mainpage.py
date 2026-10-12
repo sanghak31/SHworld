@@ -54,13 +54,20 @@ SECTIONS = [
     },
     {
         "title": "신경",
-        "desc": "자극이 전달되는 과정",
+        "desc": "자극이 전달되는 과정과 신경의 종류",
         "apps": [
             {
                 "name": "뉴런 흥분 전도 ⚡",
                 "desc": "뉴런에서 흥분이 전도되는 과정을 단계별로 확인합니다.",
                 "url": "https://neuronconduction.streamlit.app/",
                 "color": "#c4475a",
+            },
+            {
+                "name": "뉴런 탐색 · 신경의 종류 🧠",
+                "desc": "그림과 함께 신경의 종류를 하나씩 넘겨 보며 알아봅니다.",
+                # 배포한 뒤 생긴 앱 주소를 아래에 넣으면 카드가 열립니다.
+                "url": "",
+                "color": "#e07b39",
             },
         ],
     },
@@ -177,6 +184,11 @@ with right:
 # 시뮬레이션 카드
 # ──────────────────────────────────────────────
 def card_html(app: dict) -> str:
+    if not app["url"]:  # 아직 주소가 없으면 눌러도 열리지 않는 '준비 중' 카드
+        return (
+            f'<a class="card" style="--c:{app["color"]};opacity:.6;pointer-events:none">'
+            f'<h3>{app["name"]}</h3><p>{app["desc"]}</p><span class="go">준비 중</span></a>'
+        )
     return (
         f'<a class="card" style="--c:{app["color"]}" href="{app["url"]}" '
         f'target="_blank" rel="noopener">'
