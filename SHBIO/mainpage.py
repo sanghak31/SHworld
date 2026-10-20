@@ -204,6 +204,7 @@ for section in SECTIONS:
         unsafe_allow_html=True,
     )
 
+
 st.markdown(
     '<div class="note">시뮬레이션은 Streamlit 무료 서버에서 실행됩니다. '
     "한동안 접속이 없었다면 처음 열 때 깨우는 데 잠시 걸릴 수 있어요.</div>",
