@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 
 st.set_page_config(
@@ -93,6 +94,7 @@ st.markdown(
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&display=swap');
 .block-container{max-width:1080px;padding-top:2.5rem;}
 header[data-testid="stHeader"]{background:transparent;}
+[data-testid="stImage"]{display:flex;justify-content:center;}
 .hero-title{font-family:'Noto Serif KR',serif !important;font-weight:900 !important;
   font-size:clamp(1.4rem,3vw,2.4rem) !important;line-height:1.35 !important;letter-spacing:-.02em;
   margin:0 0 .8rem !important;padding:0 !important;word-break:keep-all;}
@@ -120,52 +122,36 @@ a.card .go{color:var(--c);font-weight:600;font-size:.92rem;margin-top:6px;}
 
 # ──────────────────────────────────────────────
 # 히어로: 제목 + 회전하는 DNA 이중나선
+#   자바스크립트/iframe 없이 SVG 애니메이션만으로 움직여서 어디서든 잘 돌아갑니다.
 # ──────────────────────────────────────────────
-HELIX_HTML = """
-<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}svg{display:block;}</style>
-<svg id="helix" viewBox="0 0 320 340" width="100%" height="320"
-     role="img" aria-label="천천히 회전하는 DNA 이중나선"></svg>
-<script>
-(function(){
-  var svg=document.getElementById('helix'),NS='http://www.w3.org/2000/svg',N=15,
-      cols=['#1f8a70','#d9822b','#3b6fb6','#c4475a'],rungs=[],a=[],b=[];
-  for(var i=0;i<N;i++){
-    var r=document.createElementNS(NS,'line');
-    r.setAttribute('stroke-width','4');r.setAttribute('stroke-linecap','round');
-    svg.appendChild(r);rungs.push(r);
-  }
-  for(var i=0;i<N;i++){
-    var p=document.createElementNS(NS,'circle'),q=document.createElementNS(NS,'circle');
-    p.setAttribute('fill',cols[i%4]);q.setAttribute('fill',cols[(i+2)%4]);
-    svg.appendChild(p);svg.appendChild(q);a.push(p);b.push(q);
-  }
-  function draw(t){
-    for(var i=0;i<N;i++){
-      var y=24+i*21.5,ph=t+i*0.55,x1=160+Math.sin(ph)*90,x2=160-Math.sin(ph)*90,d=Math.cos(ph);
-      rungs[i].setAttribute('x1',x1);rungs[i].setAttribute('x2',x2);
-      rungs[i].setAttribute('y1',y);rungs[i].setAttribute('y2',y);
-      rungs[i].setAttribute('stroke',cols[i%4]);rungs[i].setAttribute('opacity','.45');
-      a[i].setAttribute('cx',x1);a[i].setAttribute('cy',y);
-      a[i].setAttribute('r',8+d*3);a[i].setAttribute('opacity',.65+d*.35);
-      b[i].setAttribute('cx',x2);b[i].setAttribute('cy',y);
-      b[i].setAttribute('r',8-d*3);b[i].setAttribute('opacity',.65-d*.35);
-    }
-  }
-  draw(0);
-  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-    var s=null;(function f(ts){if(s===null)s=ts;draw((ts-s)/1400);requestAnimationFrame(f)})(0);
-  }
-})();
-</script>
-"""
+def helix_svg(n=15, steps=36, seconds=8.8):
+    cols = ["#1f8a70", "#d9822b", "#3b6fb6", "#c4475a"]
+    pi2 = 2 * math.pi
 
-def render_html(html, height):
-    """최신 Streamlit은 st.iframe, 이전 버전은 components.html을 사용합니다."""
-    if hasattr(st, "iframe"):
-        st.iframe(html.strip(), height=height)
-    else:
-        import streamlit.components.v1 as components
-        components.html(html, height=height)
+    def vals(f):
+        return ";".join(f"{f(pi2 * k / steps):.2f}" for k in range(steps + 1))
+
+    def anim(attr, f):
+        return (f'<animate attributeName="{attr}" dur="{seconds}s" repeatCount="indefinite" '
+                f'values="{vals(f)}"/>')
+
+    rungs, dots = "", ""
+    for i in range(n):
+        y = 24 + i * 21.5
+        ph = i * 0.55
+        x1 = lambda t, ph=ph: 160 + math.sin(t + ph) * 90
+        x2 = lambda t, ph=ph: 160 - math.sin(t + ph) * 90
+        d1 = lambda t, ph=ph: math.cos(t + ph)
+        rungs += (f'<line x1="{x1(0):.1f}" x2="{x2(0):.1f}" y1="{y}" y2="{y}" stroke="{cols[i % 4]}" '
+                  f'stroke-width="4" stroke-linecap="round" opacity=".45">{anim("x1", x1)}{anim("x2", x2)}</line>')
+        dots += (f'<circle cx="{x1(0):.1f}" cy="{y}" r="{8 + d1(0) * 3:.1f}" fill="{cols[i % 4]}">'
+                 f'{anim("cx", x1)}{anim("r", lambda t, d1=d1: 8 + d1(t) * 3)}'
+                 f'{anim("opacity", lambda t, d1=d1: 0.65 + d1(t) * 0.35)}</circle>'
+                 f'<circle cx="{x2(0):.1f}" cy="{y}" r="{8 - d1(0) * 3:.1f}" fill="{cols[(i + 2) % 4]}">'
+                 f'{anim("cx", x2)}{anim("r", lambda t, d1=d1: 8 - d1(t) * 3)}'
+                 f'{anim("opacity", lambda t, d1=d1: 0.65 - d1(t) * 0.35)}</circle>')
+    return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 340" width="320" height="340">'
+            + rungs + dots + '</svg>')
 
 
 left, right = st.columns([1.25, 0.75], vertical_alignment="center")
@@ -177,7 +163,7 @@ with left:
         unsafe_allow_html=True,
     )
 with right:
-    render_html(HELIX_HTML, height=330)
+    st.image(helix_svg())
 
 # ──────────────────────────────────────────────
 # 시뮬레이션 카드
@@ -203,7 +189,6 @@ for section in SECTIONS:
         f'<div class="grid">{cards}</div>',
         unsafe_allow_html=True,
     )
-
 
 st.markdown(
     '<div class="note">시뮬레이션은 Streamlit 무료 서버에서 실행됩니다. '
