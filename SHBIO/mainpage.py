@@ -2,7 +2,7 @@ import math
 import streamlit as st
 
 st.set_page_config(
-    page_title="생명과학 시뮬레이션 실험실",
+    page_title="BIOBRIDGE · 생명과학 시뮬레이션 실험실",
     page_icon="🧬",
     layout="wide",
 )
@@ -73,13 +73,25 @@ SECTIONS = [
     },
     {
         "title": "세포와 실험",
-        "desc": "세포소기관을 분리하는 실험 기법",
+        "desc": "세포소기관 분리, 세포 분열, 방사성 추적 실험",
         "apps": [
             {
                 "name": "세포 분획법 실험실 🧫",
                 "desc": "균질화한 세포액을 원심분리해 세포소기관을 분리하고 분석해 봅니다.",
                 "url": "https://fractionation.streamlit.app/",
                 "color": "#6a9a3a",
+            },
+            {
+                "name": "세포 분열 관찰실 🔬",
+                "desc": "체세포 분열과 감수분열을 단계별로 직접 관찰합니다.",
+                "url": "https://shdivision.streamlit.app/",
+                "color": "#d0a021",
+            },
+            {
+                "name": "자기방사법 시뮬레이션 ☢️",
+                "desc": "방사성 아미노산을 투입하고 거친면 소포체, 골지체, 분비소낭의 방사능 변화를 그래프로 확인합니다.",
+                "url": "https://autoradiography.streamlit.app/",
+                "color": "#7a5cc9",
             },
         ],
     },
@@ -91,10 +103,14 @@ SECTIONS = [
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Noto+Serif+KR:wght@700;900&display=swap');
 .block-container{max-width:1080px;padding-top:2.5rem;}
 header[data-testid="stHeader"]{background:transparent;}
 [data-testid="stImage"]{display:flex;justify-content:center;}
+.brand{font-family:'Montserrat','Noto Sans KR',sans-serif;font-weight:800;
+  font-size:clamp(2.2rem,5.2vw,3.8rem);line-height:1.05;letter-spacing:.03em;margin:0 0 .5rem;
+  background:linear-gradient(90deg,#1f8a70,#3b6fb6);-webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;}
 .hero-title{font-family:'Noto Serif KR',serif !important;font-weight:900 !important;
   font-size:clamp(1.4rem,3vw,2.4rem) !important;line-height:1.35 !important;letter-spacing:-.02em;
   margin:0 0 .8rem !important;padding:0 !important;word-break:keep-all;}
@@ -157,6 +173,7 @@ def helix_svg(n=15, steps=36, seconds=8.8):
 left, right = st.columns([1.25, 0.75], vertical_alignment="center")
 with left:
     st.markdown(
+        '<div class="brand">BIOBRIDGE</div>'
         '<h1 class="hero-title">눈에 보이지 않는 생명 현상을,<br>직접 움직여 보세요</h1>'
         '<p class="hero-lead">유전, 진화, 면역, 신경까지. 변수를 바꾸면 결과가 바로 달라지는 '
         "생명과학 시뮬레이션 모음입니다.</p>",
