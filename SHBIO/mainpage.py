@@ -13,7 +13,7 @@ st.set_page_config(
 SECTIONS = [
     {
         "title": "유전과 진화",
-        "desc": "염기서열에서 개체군의 변화까지",
+        "desc": "염기서열에서 개체군의 변화, 계통수까지",
         "apps": [
             {
                 "name": "DNA 염기서열 변환기 🧬",
@@ -26,6 +26,12 @@ SECTIONS = [
                 "desc": "환경 조건에 따라 개체군이 어떻게 달라지는지 관찰합니다.",
                 "url": "https://naturalselection.streamlit.app/",
                 "color": "#d9822b",
+            },
+            {
+                "name": "계통수 탐색 · 동물과 식물 🌳",
+                "desc": "동물과 식물의 계통수를 살펴보고, 공통 조상과 각 계통의 특징을 알아봅니다.",
+                "url": "https://biotree.streamlit.app/",
+                "color": "#3f9d5a",
             },
         ],
     },
@@ -54,8 +60,8 @@ SECTIONS = [
         ],
     },
     {
-        "title": "신경",
-        "desc": "자극이 전달되는 과정과 신경의 종류",
+        "title": "신경과 뇌",
+        "desc": "자극의 전달, 신경의 종류, 뇌의 구조",
         "apps": [
             {
                 "name": "뉴런 흥분 전도 ⚡",
@@ -69,12 +75,25 @@ SECTIONS = [
                 "url": "https://neuronexplore.streamlit.app/",
                 "color": "#e07b39",
             },
+            {
+                "name": "뇌 구조 탐색 🗺️",
+                "desc": "뇌의 각 부분이 어디에 있고 어떤 일을 하는지 살펴봅니다.",
+                # 배포한 뒤 생긴 앱 주소를 아래에 넣으면 카드가 열립니다.
+                "url": "",
+                "color": "#5b7fd6",
+            },
         ],
     },
     {
         "title": "세포와 실험",
-        "desc": "세포소기관 분리, 세포 분열, 방사성 추적 실험",
+        "desc": "세포소기관 탐색, 세포 분열, 물질 이동, 에너지 대사",
         "apps": [
+            {
+                "name": "세포 탐색 · 세포소기관 🔎",
+                "desc": "세포소기관의 모양과 역할을 그림과 함께 하나씩 살펴봅니다.",
+                "url": "https://shcellexplorer.streamlit.app/",
+                "color": "#2f9aa8",
+            },
             {
                 "name": "세포 분획법 실험실 🧫",
                 "desc": "균질화한 세포액을 원심분리해 세포소기관을 분리하고 분석해 봅니다.",
@@ -92,6 +111,20 @@ SECTIONS = [
                 "desc": "방사성 아미노산을 투입하고 거친면 소포체, 골지체, 분비소낭의 방사능 변화를 그래프로 확인합니다.",
                 "url": "https://autoradiography.streamlit.app/",
                 "color": "#7a5cc9",
+            },
+            {
+                "name": "세포막 물질이동 시뮬레이션 🚪",
+                "desc": "세포막을 통한 물질의 이동 방식을 시뮬레이션으로 확인합니다.",
+                # 배포한 뒤 생긴 앱 주소를 아래에 넣으면 카드가 열립니다.
+                "url": "",
+                "color": "#d9822b",
+            },
+            {
+                "name": "세포 호흡과 광합성 탐색 ☀️",
+                "desc": "세포 호흡과 광합성이 어떻게 일어나는지 단계별로 알아봅니다.",
+                # 배포한 뒤 생긴 앱 주소를 아래에 넣으면 카드가 열립니다.
+                "url": "",
+                "color": "#3f9d5a",
             },
         ],
     },
@@ -213,4 +246,4 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="site-footer">by LSH</div>', unsafe_allow_html=True)
+st.markdown('<div class="site-footer">BIOBRIDGE by LSH</div>', unsafe_allow_html=True)
